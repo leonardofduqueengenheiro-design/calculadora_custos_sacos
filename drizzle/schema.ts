@@ -1,17 +1,15 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  decimal,
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -25,4 +23,56 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// Custos fixos mensais por categoria
+export const custosFixos = mysqlTable("custos_fixos", {
+  id: int("id").autoincrement().primaryKey(),
+  categoria: mysqlEnum("categoria", [
+    "folha_pagamento",
+    "impostos_folha",
+    "energia",
+    "combustivel",
+    "transporte_frete",
+    "manutencao",
+    "servicos",
+    "comissoes",
+    "diversos",
+  ]).notNull(),
+  descricao: varchar("descricao", { length: 255 }).notNull(),
+  valorMensal: decimal("valor_mensal", { precision: 15, scale: 2 }).notNull().default("0"),
+  ativo: int("ativo").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CustoFixo = typeof custosFixos.$inferSelect;
+export type InsertCustoFixo = typeof custosFixos.$inferInsert;
+
+// Parâmetros gerais da operação
+export const parametros = mysqlTable("parametros", {
+  id: int("id").autoincrement().primaryKey(),
+  chave: varchar("chave", { length: 100 }).notNull().unique(),
+  valor: decimal("valor", { precision: 15, scale: 4 }).notNull(),
+  descricao: varchar("descricao", { length: 255 }),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Parametro = typeof parametros.$inferSelect;
+export type InsertParametro = typeof parametros.$inferInsert;
+
+// Histórico de simulações
+export const simulacoes = mysqlTable("simulacoes", {
+  id: int("id").autoincrement().primaryKey(),
+  tipo: mysqlEnum("tipo", ["margem", "preco"]).notNull(),
+  precoVenda: decimal("preco_venda", { precision: 15, scale: 4 }),
+  margemDesejada: decimal("margem_desejada", { precision: 8, scale: 4 }),
+  custoTotalKg: decimal("custo_total_kg", { precision: 15, scale: 4 }).notNull(),
+  margemUnitaria: decimal("margem_unitaria", { precision: 15, scale: 4 }),
+  margemPercentual: decimal("margem_percentual", { precision: 8, scale: 4 }),
+  margemMensal: decimal("margem_mensal", { precision: 15, scale: 2 }),
+  precoMinimo: decimal("preco_minimo", { precision: 15, scale: 4 }),
+  observacao: text("observacao"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Simulacao = typeof simulacoes.$inferSelect;
+export type InsertSimulacao = typeof simulacoes.$inferInsert;
