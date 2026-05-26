@@ -8,6 +8,7 @@ import {
   History,
   Factory,
   ChevronRight,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,12 @@ const navItems = [
     label: "Histórico",
     icon: History,
     description: "Simulações salvas",
+  },
+  {
+    href: "/importar",
+    label: "Importar Planilha",
+    icon: Upload,
+    description: "Atualizar com Excel",
   },
 ];
 

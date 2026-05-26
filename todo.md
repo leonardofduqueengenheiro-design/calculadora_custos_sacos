@@ -21,3 +21,15 @@
 - [x] Design elegante e refinado (tema escuro premium)
 - [x] Dados iniciais pré-carregados com valores reais do cliente
 - [x] Testes vitest
+
+## Novas Funcionalidades (v2)
+
+- [x] Planilha Excel modelo de controle financeiro (colunas: vencimento, valor, nº doc, fornecedor, tipo, empresa, dist lucro, obs, status, recorrente, onde, obs2)
+- [x] Aba de instruções na planilha modelo com lista de tipos válidos e empresas
+- [x] Backend: endpoint de upload de arquivo Excel (.xlsx)
+- [x] Backend: processamento/parsing da planilha e extração de custos por categoria
+- [x] Backend: atualização automática dos custos fixos e variáveis a partir da planilha
+- [x] Frontend: página de Importação com upload drag-and-drop
+- [x] Frontend: preview dos dados extraídos antes de confirmar atualização
+- [x] Frontend: resumo do período importado e totais por categoria
+- [x] Frontend: link para download da planilha modelo

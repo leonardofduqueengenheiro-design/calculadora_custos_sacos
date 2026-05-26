@@ -10,6 +10,7 @@ import CustosVariaveis from "./pages/CustosVariaveis";
 import Parametros from "./pages/Parametros";
 import Simulador from "./pages/Simulador";
 import Historico from "./pages/Historico";
+import Importar from "./pages/Importar";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/parametros" component={Parametros} />
         <Route path="/simulador" component={Simulador} />
         <Route path="/historico" component={Historico} />
+        <Route path="/importar" component={Importar} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
