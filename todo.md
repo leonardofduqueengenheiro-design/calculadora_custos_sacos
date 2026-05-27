@@ -61,9 +61,9 @@
 
 ## Novas Funcionalidades (v6)
 
-- [ ] Bug: corrigir gravação do nome do produto na página Produtos
-- [ ] Combustível: separar em parcela fixa e variável por kg (configurável)
-- [ ] Transporte/Frete: separar em parcela fixa e variável por kg (configurável)
-- [ ] Parâmetros: campos de percentual fixo/variável para combustível e frete
-- [ ] Lógica de cálculo: combustível e frete variáveis entram no custo por kg
-- [ ] Break-Even Chart: atualizar para incluir combustível e frete variáveis
+- [x] Bug: corrigir gravação do nome do produto na página Produtos
+- [x] Combustível: separar em parcela fixa e variável por kg (configurável)
+- [x] Transporte/Frete: separar em parcela fixa e variável por kg (configurável)
+- [x] Parâmetros: campos de percentual fixo/variável para combustível e frete
+- [x] Lógica de cálculo: combustível e frete variáveis entram no custo por kg
+- [x] Break-Even Chart: atualizar para incluir combustível e frete variáveis

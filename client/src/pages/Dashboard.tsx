@@ -188,7 +188,7 @@ export default function Dashboard() {
   // Receita Total = Preço de Venda × Volume × (1 - alíquota SIMPLES)
   // Ponto de equilíbrio: volume onde Receita = Custo Total
   const custoFixoMensal = resumo.totalFixosMensal;
-  const custoVarKg = resumo.custoMpKg; // custo variável por kg (MP)
+  const custoVarKg = resumo.custoMpKg + (resumo.totalVariavelKg ?? 0); // custo variável por kg (MP + energia + combustível + frete variáveis)
   const receitaLiquidaKg = resumo.precoVenda * (1 - resumo.aliquotaSimples / 100); // receita líquida por kg (descontando SIMPLES)
 
   // Volume do ponto de equilíbrio: CustoFixo + CustoVar*V = ReceitaLiq*V
@@ -429,7 +429,7 @@ export default function Dashboard() {
           </div>
           <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
             <span className="font-medium" style={{ color: "oklch(0.65 0.22 25)" }}>Custo Total</span>
-            {" "}= Custos Fixos ({formatBRL(custoFixoMensal, 0)}/mês) + MP ({formatBRL(custoVarKg, 4)}/kg × Volume)
+            {" "}= Custos Fixos ({formatBRL(custoFixoMensal, 0)}/mês) + Var. ({formatBRL(custoVarKg, 4)}/kg × Volume)
           </div>
           <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
             <span className="font-medium" style={{ color: "oklch(0.78 0.18 75)" }}>Ponto de Equilíbrio</span>
