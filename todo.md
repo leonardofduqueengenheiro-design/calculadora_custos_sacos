@@ -49,12 +49,21 @@
 
 ## Novas Funcionalidades (v5)
 
-- [ ] Energia elétrica: separar em parcela fixa (20%) e variável (80% por kg produzido)
-- [ ] Parâmetros: campo de percentual fixo/variável da energia editável
-- [ ] Lógica de cálculo: custo variável de energia entra no custo por kg junto com MP
-- [ ] Break-Even Chart: atualizar para incluir energia variável no custo variável por kg
-- [ ] DB: tabela produtos com nome, composição de MP própria (até 5 MPs com %)
-- [ ] Backend: rotas tRPC para CRUD de produtos e análise de mix
-- [ ] Página Mix de Produtos: cadastro de até 4 produtos com nome, MPs e percentuais
-- [ ] Página Análise de Período: informar kg produzido/vendido e preço por produto, ver margem individual e consolidada
-- [ ] Dashboard: indicador de custo variável de energia por kg
+- [x] Energia elétrica: separar em parcela fixa (20%) e variável (80% por kg produzido)
+- [x] Parâmetros: campo de percentual fixo/variável da energia editável
+- [x] Lógica de cálculo: custo variável de energia entra no custo por kg junto com MP
+- [x] Break-Even Chart: atualizar para incluir energia variável no custo variável por kg
+- [x] DB: tabela produtos com nome, composição de MP própria (até 5 MPs com %)
+- [x] Backend: rotas tRPC para CRUD de produtos e análise de mix
+- [x] Página Mix de Produtos: cadastro de até 4 produtos com nome, MPs e percentuais
+- [x] Página Análise de Período: informar kg produzido/vendido e preço por produto, ver margem individual e consolidada
+- [x] Dashboard: indicador de custo variável de energia por kg
+
+## Novas Funcionalidades (v6)
+
+- [ ] Bug: corrigir gravação do nome do produto na página Produtos
+- [ ] Combustível: separar em parcela fixa e variável por kg (configurável)
+- [ ] Transporte/Frete: separar em parcela fixa e variável por kg (configurável)
+- [ ] Parâmetros: campos de percentual fixo/variável para combustível e frete
+- [ ] Lógica de cálculo: combustível e frete variáveis entram no custo por kg
+- [ ] Break-Even Chart: atualizar para incluir combustível e frete variáveis

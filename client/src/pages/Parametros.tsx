@@ -2,7 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatBRL, formatKg } from "@/lib/format";
 import { toast } from "sonner";
-import { Save, Factory, Package, Calendar, Sun, Zap } from "lucide-react";
+import { Save, Factory, Package, Calendar, Sun, Zap, Truck, Fuel } from "lucide-react";
 
 function ParamField({
   label,
@@ -97,6 +97,8 @@ export default function Parametros() {
   const estoque = paramMap['estoque_atual_kg'] ?? 100000;
   const precoVenda = paramMap['preco_venda_atual'] ?? 24;
   const energiaPercentualFixo = paramMap['energia_percentual_fixo'] ?? 20;
+  const combustivelPercentualFixo = paramMap['combustivel_percentual_fixo'] ?? 30;
+  const fretePercentualFixo = paramMap['frete_percentual_fixo'] ?? 40;
 
   const handleSave = (chave: string, valor: number) => {
     setParam.mutate({ chave, valor });
@@ -158,6 +160,76 @@ export default function Parametros() {
               <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Energia Variável</p>
               <p className="text-lg font-bold" style={{ color: "oklch(0.72 0.18 120)" }}>{100 - energiaPercentualFixo}%</p>
               <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Proporcional à produção</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Combustível Misto */}
+        <div className="rounded-xl p-6 card-gradient space-y-5" style={{ border: "1px solid var(--border)" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.72 0.18 50 / 0.15)", border: "1px solid oklch(0.72 0.18 50 / 0.25)" }}>
+              <Fuel className="w-5 h-5" style={{ color: "oklch(0.72 0.18 50)" }} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Combustível</h2>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Distribuição entre custo fixo e variável</p>
+            </div>
+          </div>
+          <ParamField
+            label="Percentual Fixo do Combustível"
+            chave="combustivel_percentual_fixo"
+            value={combustivelPercentualFixo}
+            suffix="%"
+            step={5}
+            min={0}
+            description={`Parte do combustível que é fixa (frota parada, manutenção). O restante (${100 - combustivelPercentualFixo}%) varia com a produção.`}
+            onSave={handleSave}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg p-3 text-center" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Combustível Fixo</p>
+              <p className="text-lg font-bold" style={{ color: "var(--foreground)" }}>{combustivelPercentualFixo}%</p>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Vai para custo fixo/kg</p>
+            </div>
+            <div className="rounded-lg p-3 text-center" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Combustível Variável</p>
+              <p className="text-lg font-bold" style={{ color: "oklch(0.72 0.18 50)" }}>{100 - combustivelPercentualFixo}%</p>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Proporcional à produção</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Frete/Transporte Misto */}
+        <div className="rounded-xl p-6 card-gradient space-y-5" style={{ border: "1px solid var(--border)" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.72 0.18 280 / 0.15)", border: "1px solid oklch(0.72 0.18 280 / 0.25)" }}>
+              <Truck className="w-5 h-5" style={{ color: "oklch(0.72 0.18 280)" }} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Transporte / Frete</h2>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Distribuição entre custo fixo e variável</p>
+            </div>
+          </div>
+          <ParamField
+            label="Percentual Fixo do Frete"
+            chave="frete_percentual_fixo"
+            value={fretePercentualFixo}
+            suffix="%"
+            step={5}
+            min={0}
+            description={`Parte do frete que é fixa (contratos fixos, frota própria). O restante (${100 - fretePercentualFixo}%) varia com o volume entregue.`}
+            onSave={handleSave}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg p-3 text-center" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Frete Fixo</p>
+              <p className="text-lg font-bold" style={{ color: "var(--foreground)" }}>{fretePercentualFixo}%</p>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Vai para custo fixo/kg</p>
+            </div>
+            <div className="rounded-lg p-3 text-center" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Frete Variável</p>
+              <p className="text-lg font-bold" style={{ color: "oklch(0.72 0.18 280)" }}>{100 - fretePercentualFixo}%</p>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Proporcional ao volume entregue</p>
             </div>
           </div>
         </div>

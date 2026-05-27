@@ -29,25 +29,56 @@ import {
 // ─── Lógica de cálculo financeiro ────────────────────────────────────────────
 
 /**
- * Energia mista: parte fixa vai para custos fixos, parte variável é custo por kg.
+ * Custos mistos: energia, combustível e frete têm parcela fixa e variável por kg.
+ * A parte variável é proporcional à produção e entra no custo por kg.
  */
+function calcularCustosMistos(
+  custos: Array<{ categoria: string; valorMensal: string }>,
+  energiaPercentualFixo: number,
+  combustivelPercentualFixo: number,
+  fretePercentualFixo: number,
+  producaoMensal: number
+) {
+  const categoriasMistas = [
+    { cat: 'energia', pctFixo: Math.min(Math.max(energiaPercentualFixo, 0), 100) / 100 },
+    { cat: 'combustivel', pctFixo: Math.min(Math.max(combustivelPercentualFixo, 0), 100) / 100 },
+    { cat: 'transporte_frete', pctFixo: Math.min(Math.max(fretePercentualFixo, 0), 100) / 100 },
+  ];
+
+  let totalFixos = 0;
+  let totalVariavelKg = 0;
+
+  for (const c of custos) {
+    const mista = categoriasMistas.find(m => m.cat === c.categoria);
+    const valor = parseFloat(c.valorMensal);
+    if (mista) {
+      totalFixos += valor * mista.pctFixo;
+      const variavelMensal = valor * (1 - mista.pctFixo);
+      totalVariavelKg += producaoMensal > 0 ? variavelMensal / producaoMensal : 0;
+    } else {
+      totalFixos += valor;
+    }
+  }
+
+  // Detalhe por categoria para retorno
+  const totalEnergia = custos.filter(c => c.categoria === 'energia').reduce((s, c) => s + parseFloat(c.valorMensal), 0);
+  const energiaVariavelKg = producaoMensal > 0 ? totalEnergia * (1 - energiaPercentualFixo / 100) / producaoMensal : 0;
+  const totalCombustivel = custos.filter(c => c.categoria === 'combustivel').reduce((s, c) => s + parseFloat(c.valorMensal), 0);
+  const combustivelVariavelKg = producaoMensal > 0 ? totalCombustivel * (1 - combustivelPercentualFixo / 100) / producaoMensal : 0;
+  const totalFrete = custos.filter(c => c.categoria === 'transporte_frete').reduce((s, c) => s + parseFloat(c.valorMensal), 0);
+  const freteVariavelKg = producaoMensal > 0 ? totalFrete * (1 - fretePercentualFixo / 100) / producaoMensal : 0;
+
+  return { totalFixos, totalVariavelKg, energiaVariavelKg, combustivelVariavelKg, freteVariavelKg };
+}
+
+// Mantido para compatibilidade retroativa
 function calcularCustosComEnergiaMista(
   custos: Array<{ categoria: string; valorMensal: string }>,
   energiaPercentualFixo: number,
   producaoMensal: number
 ) {
-  const totalEnergia = custos
-    .filter(c => c.categoria === 'energia')
-    .reduce((s, c) => s + parseFloat(c.valorMensal), 0);
-  const totalSemEnergia = custos
-    .filter(c => c.categoria !== 'energia')
-    .reduce((s, c) => s + parseFloat(c.valorMensal), 0);
-  const pctFixo = Math.min(Math.max(energiaPercentualFixo, 0), 100) / 100;
-  const energiaFixaMensal = totalEnergia * pctFixo;
-  const energiaVariavelMensal = totalEnergia * (1 - pctFixo);
-  const energiaVariavelKg = producaoMensal > 0 ? energiaVariavelMensal / producaoMensal : 0;
-  const totalFixos = totalSemEnergia + energiaFixaMensal;
-  return { totalFixos, energiaVariavelKg, totalEnergia, energiaFixaMensal };
+  const r = calcularCustosMistos(custos, energiaPercentualFixo, 100, 100, producaoMensal);
+  return { totalFixos: r.totalFixos, energiaVariavelKg: r.energiaVariavelKg, totalEnergia: 0, energiaFixaMensal: 0 };
 }
 
 function calcularCustoFixoKg(totalFixos: number, producaoMensal: number): number {
@@ -147,7 +178,9 @@ const calculoRouter = router({
 
     const producaoMensal = paramMap['producao_mensal_kg'] ?? 31498;
     const energiaPercentualFixo = paramMap['energia_percentual_fixo'] ?? 20;
-    const { totalFixos, energiaVariavelKg } = calcularCustosComEnergiaMista(custos, energiaPercentualFixo, producaoMensal);
+    const combustivelPercentualFixo = paramMap['combustivel_percentual_fixo'] ?? 30;
+    const fretePercentualFixo = paramMap['frete_percentual_fixo'] ?? 40;
+    const { totalFixos, totalVariavelKg, energiaVariavelKg, combustivelVariavelKg, freteVariavelKg } = calcularCustosMistos(custos, energiaPercentualFixo, combustivelPercentualFixo, fretePercentualFixo, producaoMensal);
 
     const custoMpKgPonderado = await getCustoMpPonderado();
     const custoMpKg = custoMpKgPonderado > 0 ? custoMpKgPonderado : (paramMap['custo_mp_kg'] ?? 7.37);
@@ -158,7 +191,7 @@ const calculoRouter = router({
     const mps = await getMateriasPrimas();
 
     const custoFixoKg = calcularCustoFixoKg(totalFixos, producaoMensal);
-    const custoTotalKg = calcularCustoTotalKg(custoFixoKg, custoMpKg, energiaVariavelKg);
+    const custoTotalKg = calcularCustoTotalKg(custoFixoKg, custoMpKg, totalVariavelKg);
     const { margemUnitaria, margemPercentual, simplesKg } = calcularMargem(precoVenda, custoTotalKg, aliquotaSimples);
     const margemMensal = margemUnitaria * producaoMensal;
     const faturamentoMensal = precoVenda * producaoMensal;
@@ -172,6 +205,11 @@ const calculoRouter = router({
       custoMpKg,
       energiaVariavelKg,
       energiaPercentualFixo,
+      combustivelVariavelKg,
+      combustivelPercentualFixo,
+      freteVariavelKg,
+      fretePercentualFixo,
+      totalVariavelKg,
       custoTotalKg,
       aliquotaSimples,
       precoVenda,

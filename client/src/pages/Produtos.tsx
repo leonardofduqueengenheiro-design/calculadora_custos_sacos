@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,11 @@ function ProdutoCard({ produto }: { produto: any }) {
   const [expanded, setExpanded] = useState(false);
   const [editingNome, setEditingNome] = useState(false);
   const [nomeEdit, setNomeEdit] = useState(produto.nome);
+
+  // Sincroniza o estado local com o valor atualizado do servidor
+  useEffect(() => {
+    if (!editingNome) setNomeEdit(produto.nome);
+  }, [produto.nome, editingNome]);
   const [mps, setMps] = useState<MpRow[]>(
     Array.from({ length: 5 }, (_, i) => {
       const existing = produto.materiasPrimas.find((m: any) => m.ordem === i + 1);
@@ -49,7 +54,7 @@ function ProdutoCard({ produto }: { produto: any }) {
     if (!nomeEdit.trim()) return;
     try {
       await updateNomeMutation.mutateAsync({ id: produto.id, nome: nomeEdit });
-      utils.produtos.list.invalidate();
+      await utils.produtos.list.invalidate();
       setEditingNome(false);
       toast.success("Nome atualizado!");
     } catch {

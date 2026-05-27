@@ -351,3 +351,86 @@ describe("Análise por Mix de Produtos", () => {
     expect(resultados[1].margemPercentual).toBeGreaterThan(resultados[0].margemPercentual);
   });
 });
+
+// ─── Lógica de custos mistos: energia + combustível + frete ──────────────────
+function calcularCustosMistos(
+  custos: { categoria: string; valor: number }[],
+  energiaPercentualFixo: number,
+  combustivelPercentualFixo: number,
+  fretePercentualFixo: number,
+  producaoMensal: number
+) {
+  let totalFixos = 0;
+  let energiaVariavelTotal = 0;
+  let combustivelVariavelTotal = 0;
+  let freteVariavelTotal = 0;
+
+  for (const c of custos) {
+    if (c.categoria === "energia_eletrica") {
+      totalFixos += c.valor * (energiaPercentualFixo / 100);
+      energiaVariavelTotal += c.valor * (1 - energiaPercentualFixo / 100);
+    } else if (c.categoria === "combustivel") {
+      totalFixos += c.valor * (combustivelPercentualFixo / 100);
+      combustivelVariavelTotal += c.valor * (1 - combustivelPercentualFixo / 100);
+    } else if (c.categoria === "transporte_frete") {
+      totalFixos += c.valor * (fretePercentualFixo / 100);
+      freteVariavelTotal += c.valor * (1 - fretePercentualFixo / 100);
+    } else {
+      totalFixos += c.valor;
+    }
+  }
+
+  const energiaVariavelKg = producaoMensal > 0 ? energiaVariavelTotal / producaoMensal : 0;
+  const combustivelVariavelKg = producaoMensal > 0 ? combustivelVariavelTotal / producaoMensal : 0;
+  const freteVariavelKg = producaoMensal > 0 ? freteVariavelTotal / producaoMensal : 0;
+  const totalVariavelKg = energiaVariavelKg + combustivelVariavelKg + freteVariavelKg;
+
+  return { totalFixos, totalVariavelKg, energiaVariavelKg, combustivelVariavelKg, freteVariavelKg };
+}
+
+describe("Custos Mistos — Combustível e Frete", () => {
+  it("separa combustível em 30% fixo e 70% variável", () => {
+    const custos = [{ categoria: "combustivel", valor: 6003 }];
+    const { totalFixos, combustivelVariavelKg } = calcularCustosMistos(custos, 20, 30, 40, 31498);
+    expect(totalFixos).toBeCloseTo(6003 * 0.30, 0);
+    expect(combustivelVariavelKg).toBeCloseTo((6003 * 0.70) / 31498, 4);
+  });
+
+  it("separa frete em 40% fixo e 60% variável", () => {
+    const custos = [{ categoria: "transporte_frete", valor: 18334 }];
+    const { totalFixos, freteVariavelKg } = calcularCustosMistos(custos, 20, 30, 40, 31498);
+    expect(totalFixos).toBeCloseTo(18334 * 0.40, 0);
+    expect(freteVariavelKg).toBeCloseTo((18334 * 0.60) / 31498, 4);
+  });
+
+  it("totalVariavelKg soma energia + combustível + frete variáveis", () => {
+    const custos = [
+      { categoria: "energia_eletrica", valor: 22694 },
+      { categoria: "combustivel", valor: 6003 },
+      { categoria: "transporte_frete", valor: 18334 },
+    ];
+    const { totalVariavelKg, energiaVariavelKg, combustivelVariavelKg, freteVariavelKg } =
+      calcularCustosMistos(custos, 20, 30, 40, 31498);
+    expect(totalVariavelKg).toBeCloseTo(energiaVariavelKg + combustivelVariavelKg + freteVariavelKg, 6);
+  });
+
+  it("outros custos vão integralmente para fixos", () => {
+    const custos = [
+      { categoria: "folha_pagamento", valor: 126146 },
+      { categoria: "servicos", valor: 19551 },
+    ];
+    const { totalFixos, totalVariavelKg } = calcularCustosMistos(custos, 20, 30, 40, 31498);
+    expect(totalFixos).toBeCloseTo(126146 + 19551, 0);
+    expect(totalVariavelKg).toBeCloseTo(0, 4);
+  });
+
+  it("com 100% fixo em todos, variável por kg é zero", () => {
+    const custos = [
+      { categoria: "energia_eletrica", valor: 10000 },
+      { categoria: "combustivel", valor: 5000 },
+      { categoria: "transporte_frete", valor: 8000 },
+    ];
+    const { totalVariavelKg } = calcularCustosMistos(custos, 100, 100, 100, 31498);
+    expect(totalVariavelKg).toBeCloseTo(0, 4);
+  });
+});
