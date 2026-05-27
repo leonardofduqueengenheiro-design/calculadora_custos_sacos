@@ -15,6 +15,13 @@
       "when": 1779807218593,
       "tag": "0001_deep_beyonder",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1779882895763,
+      "tag": "0002_thankful_meltdown",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, custosFixos, parametros, simulacoes, users } from "../drizzle/schema";
+import { InsertUser, custosFixos, materiasPrimas, parametros, simulacoes, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -118,6 +118,33 @@ export async function setParametro(chave: string, valor: string, descricao?: str
   await db.insert(parametros)
     .values({ chave, valor, descricao })
     .onDuplicateKeyUpdate({ set: { valor, ...(descricao ? { descricao } : {}) } });
+}
+
+
+// ─── Matérias-Primas ─────────────────────────────────────────────────────────
+
+export async function getMateriasPrimas() {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.select().from(materiasPrimas).where(eq(materiasPrimas.ativo, 1));
+  return result.sort((a, b) => a.ordem - b.ordem);
+}
+
+export async function upsertMateriaPrima(id: number, data: { nome: string; custoKg: string; percentualUso: string; }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(materiasPrimas)
+    .set({ nome: data.nome, custoKg: data.custoKg, percentualUso: data.percentualUso })
+    .where(eq(materiasPrimas.id, id));
+}
+
+export async function getCustoMpPonderado(): Promise<number> {
+  const mps = await getMateriasPrimas();
+  if (mps.length === 0) return 0;
+  const totalPct = mps.reduce((s, m) => s + parseFloat(m.percentualUso), 0);
+  if (totalPct <= 0) return 0;
+  const ponderado = mps.reduce((s, m) => s + parseFloat(m.custoKg) * parseFloat(m.percentualUso), 0);
+  return ponderado / totalPct;
 }
 
 // ─── Simulações ──────────────────────────────────────────────────────────────

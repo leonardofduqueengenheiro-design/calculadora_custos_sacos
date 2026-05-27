@@ -23,6 +23,57 @@ function calcularMargem(precoVenda: number, custoTotalKg: number, aliquotaSimple
   return { simplesKg, margemUnitaria, margemPercentual };
 }
 
+// Replicar lógica de custo médio ponderado
+function calcularCustoMpPonderado(mps: { custoKg: number; percentualUso: number }[]): number {
+  const totalPct = mps.reduce((s, m) => s + m.percentualUso, 0);
+  if (totalPct <= 0) return 0;
+  const ponderado = mps.reduce((s, m) => s + m.custoKg * m.percentualUso, 0);
+  return ponderado / totalPct;
+}
+
+describe("Custo Médio Ponderado de Matérias-Primas", () => {
+  it("calcula corretamente com duas MPs", () => {
+    const mps = [
+      { custoKg: 7.00, percentualUso: 60 },
+      { custoKg: 8.00, percentualUso: 40 },
+    ];
+    expect(calcularCustoMpPonderado(mps)).toBeCloseTo(7.40, 4);
+  });
+
+  it("retorna custo único quando há apenas uma MP com 100%", () => {
+    const mps = [{ custoKg: 7.37, percentualUso: 100 }];
+    expect(calcularCustoMpPonderado(mps)).toBeCloseTo(7.37, 4);
+  });
+
+  it("retorna 0 quando total de percentuais é 0", () => {
+    const mps = [{ custoKg: 7.37, percentualUso: 0 }];
+    expect(calcularCustoMpPonderado(mps)).toBe(0);
+  });
+
+  it("calcula corretamente com 5 MPs", () => {
+    const mps = [
+      { custoKg: 7.37, percentualUso: 60 },
+      { custoKg: 7.80, percentualUso: 25 },
+      { custoKg: 8.10, percentualUso: 10 },
+      { custoKg: 6.50, percentualUso: 3 },
+      { custoKg: 9.00, percentualUso: 2 },
+    ];
+    // (7.37*60 + 7.80*25 + 8.10*10 + 6.50*3 + 9.00*2) / 100
+    const esperado = (7.37*60 + 7.80*25 + 8.10*10 + 6.50*3 + 9.00*2) / 100;
+    expect(calcularCustoMpPonderado(mps)).toBeCloseTo(esperado, 4);
+  });
+
+  it("normaliza percentuais que não somam 100%", () => {
+    // Se percentuais somam 50, ainda deve calcular a média ponderada corretamente
+    const mps = [
+      { custoKg: 7.00, percentualUso: 30 },
+      { custoKg: 8.00, percentualUso: 20 },
+    ];
+    // (7*30 + 8*20) / 50 = (210 + 160) / 50 = 7.4
+    expect(calcularCustoMpPonderado(mps)).toBeCloseTo(7.4, 4);
+  });
+});
+
 describe("Cálculo de Custo Fixo por kg", () => {
   it("divide total de fixos pela produção mensal", () => {
     const result = calcularCustoFixoKg(285540.79, 31498);

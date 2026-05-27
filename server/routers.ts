@@ -12,6 +12,9 @@ import {
   getSimulacoes,
   saveSimulacao,
   deleteSimulacao,
+  getMateriasPrimas,
+  upsertMateriaPrima,
+  getCustoMpPonderado,
 } from "./db";
 
 // ─── Lógica de cálculo financeiro ────────────────────────────────────────────
@@ -113,11 +116,13 @@ const calculoRouter = router({
 
     const totalFixos = custos.reduce((sum, c) => sum + parseFloat(c.valorMensal), 0);
     const producaoMensal = paramMap['producao_mensal_kg'] ?? 31498;
-    const custoMpKg = paramMap['custo_mp_kg'] ?? 8.234;
+    const custoMpKgPonderado = await getCustoMpPonderado();
+    const custoMpKg = custoMpKgPonderado > 0 ? custoMpKgPonderado : (paramMap['custo_mp_kg'] ?? 7.37);
     const aliquotaSimples = paramMap['aliquota_simples'] ?? 11;
     const precoVenda = paramMap['preco_venda_atual'] ?? 24;
     const estoque = paramMap['estoque_atual_kg'] ?? 100000;
     const producaoDiaria = paramMap['producao_diaria_kg'] ?? 1500;
+    const mps = await getMateriasPrimas();
 
     const custoFixoKg = calcularCustoFixoKg(totalFixos, producaoMensal);
     const custoTotalKg = calcularCustoTotalKg(custoFixoKg, custoMpKg);
@@ -126,6 +131,7 @@ const calculoRouter = router({
     const faturamentoMensal = precoVenda * producaoMensal;
     const lucroPotencialEstoque = margemUnitaria * estoque;
     const mesesEstoque = producaoMensal > 0 ? estoque / producaoMensal : 0;
+    const totalPercentual = mps.reduce((s, m) => s + parseFloat(m.percentualUso), 0);
 
     return {
       totalFixosMensal: totalFixos,
@@ -144,6 +150,14 @@ const calculoRouter = router({
       estoque,
       lucroPotencialEstoque,
       mesesEstoque,
+      materiasPrimas: mps.map(m => ({
+        id: m.id,
+        ordem: m.ordem,
+        nome: m.nome,
+        custoKg: parseFloat(m.custoKg),
+        percentualUso: parseFloat(m.percentualUso),
+      })),
+      totalPercentual,
     };
   }),
 
@@ -285,6 +299,35 @@ const calculoRouter = router({
     }),
 });
 
+const materiasPrimasRouter = router({
+  list: publicProcedure.query(async () => {
+    return getMateriasPrimas();
+  }),
+
+  update: publicProcedure
+    .input(z.object({
+      id: z.number(),
+      nome: z.string().min(1),
+      custoKg: z.number().min(0),
+      percentualUso: z.number().min(0).max(100),
+    }))
+    .mutation(async ({ input }) => {
+      await upsertMateriaPrima(input.id, {
+        nome: input.nome,
+        custoKg: input.custoKg.toFixed(4),
+        percentualUso: input.percentualUso.toFixed(4),
+      });
+      return { success: true };
+    }),
+
+  custoMedioPonderado: publicProcedure.query(async () => {
+    const custo = await getCustoMpPonderado();
+    const mps = await getMateriasPrimas();
+    const totalPct = mps.reduce((s, m) => s + parseFloat(m.percentualUso), 0);
+    return { custo, totalPercentual: totalPct };
+  }),
+});
+
 const simulacoesRouter = router({
   list: publicProcedure.query(async () => {
     return getSimulacoes(50);
@@ -312,6 +355,7 @@ export const appRouter = router({
   parametros: parametrosRouter,
   calculo: calculoRouter,
   simulacoes: simulacoesRouter,
+  materiasPrimas: materiasPrimasRouter,
 });
 
 export type AppRouter = typeof appRouter;

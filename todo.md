@@ -33,3 +33,12 @@
 - [x] Frontend: preview dos dados extraídos antes de confirmar atualização
 - [x] Frontend: resumo do período importado e totais por categoria
 - [x] Frontend: link para download da planilha modelo
+
+## Novas Funcionalidades (v3)
+
+- [ ] Banco de dados: tabela materias_primas com campos nome, custo_kg, percentual_uso
+- [ ] Backend: rotas tRPC para CRUD de múltiplas matérias-primas (até 5)
+- [ ] Backend: cálculo de custo médio ponderado de MP
+- [ ] Frontend: página Custos Variáveis com 5 campos de MP (nome, R$/kg, % uso)
+- [ ] Frontend: exibição do custo médio ponderado calculado automaticamente
+- [ ] Validação: soma dos percentuais deve ser 100%

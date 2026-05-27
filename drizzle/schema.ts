@@ -76,3 +76,17 @@ export const simulacoes = mysqlTable("simulacoes", {
 
 export type Simulacao = typeof simulacoes.$inferSelect;
 export type InsertSimulacao = typeof simulacoes.$inferInsert;
+
+// Matérias-primas (múltiplas, até 5)
+export const materiasPrimas = mysqlTable("materias_primas", {
+  id: int("id").autoincrement().primaryKey(),
+  ordem: int("ordem").notNull().default(1), // 1 a 5
+  nome: varchar("nome", { length: 100 }).notNull(),
+  custoKg: decimal("custo_kg", { precision: 15, scale: 4 }).notNull().default("0"),
+  percentualUso: decimal("percentual_uso", { precision: 8, scale: 4 }).notNull().default("0"), // 0 a 100
+  ativo: int("ativo").default(1).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MateriaPrima = typeof materiasPrimas.$inferSelect;
+export type InsertMateriaPrima = typeof materiasPrimas.$inferInsert;
