@@ -97,6 +97,8 @@ export const produtos = mysqlTable("produtos", {
   ordem: int("ordem").notNull().default(1),
   nome: varchar("nome", { length: 150 }).notNull(),
   descricao: text("descricao"),
+  // Preço de venda padrão por produto — pré-preenche Análise por Mix e Otimizador
+  precoVendaPadrao: decimal("preco_venda_padrao", { precision: 15, scale: 4 }),
   ativo: int("ativo").default(1).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -134,6 +136,19 @@ export const analisesPeriodo = mysqlTable("analises_periodo", {
 
 export type AnalisePeriodo = typeof analisesPeriodo.$inferSelect;
 export type InsertAnalisePeriodo = typeof analisesPeriodo.$inferInsert;
+
+// Histórico de variação de custo de matéria-prima
+export const historicoCustoMp = mysqlTable("historico_custo_mp", {
+  id: int("id").autoincrement().primaryKey(),
+  materiaPrimaId: int("materia_prima_id").notNull(),
+  nomeMP: varchar("nome_mp", { length: 100 }).notNull(),
+  custoAnterior: decimal("custo_anterior", { precision: 15, scale: 4 }).notNull(),
+  custoNovo: decimal("custo_novo", { precision: 15, scale: 4 }).notNull(),
+  dataAlteracao: timestamp("data_alteracao").defaultNow().notNull(),
+});
+
+export type HistoricoCustoMp = typeof historicoCustoMp.$inferSelect;
+export type InsertHistoricoCustoMp = typeof historicoCustoMp.$inferInsert;
 
 // Itens de cada análise de período
 export const analiseItens = mysqlTable("analise_itens", {

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, analiseItens, analisesPeriodo, custosFixos, materiasPrimas, parametros, produtoMateriasPrimas, produtos, simulacoes, users } from "../drizzle/schema";
+import { InsertUser, analiseItens, analisesPeriodo, custosFixos, historicoCustoMp, materiasPrimas, parametros, produtoMateriasPrimas, produtos, simulacoes, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -301,4 +301,83 @@ export async function deleteAnalise(id: number) {
   if (!db) throw new Error("DB unavailable");
   await db.delete(analiseItens).where(eq(analiseItens.analiseId, id));
   await db.delete(analisesPeriodo).where(eq(analisesPeriodo.id, id));
+}
+
+// ─── Preço de Venda Padrão por Produto ───────────────────────────────────────
+
+export async function updatePrecoVendaPadrao(produtoId: number, preco: string | null) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(produtos)
+    .set({ precoVendaPadrao: preco })
+    .where(eq(produtos.id, produtoId));
+}
+
+// ─── Histórico de Custo de MP ─────────────────────────────────────────────────
+
+export async function registrarHistoricoCustoMp(data: {
+  materiaPrimaId: number;
+  nomeMP: string;
+  custoAnterior: string;
+  custoNovo: string;
+}) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(historicoCustoMp).values(data);
+}
+
+export async function getHistoricoCustoMp(materiaPrimaId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.select().from(historicoCustoMp)
+    .where(eq(historicoCustoMp.materiaPrimaId, materiaPrimaId));
+  return result
+    .sort((a, b) => new Date(b.dataAlteracao).getTime() - new Date(a.dataAlteracao).getTime())
+    .slice(0, limit);
+}
+
+// ─── Verificação de Custos Desatualizados ─────────────────────────────────────
+
+/**
+ * Retorna as linhas de produto_materias_primas vinculadas cujo custo difere do catálogo global.
+ * Tolerancia de 0.0001 para evitar falsos positivos de arredondamento.
+ */
+export async function getCustosDesatualizados() {
+  const mps = await getMateriasPrimas();
+  const db = await getDb();
+  if (!db) return [];
+
+  const desatualizados: Array<{
+    produtoMpId: number;
+    produtoId: number;
+    ordem: number;
+    nomeProdutoMp: string;
+    materiaPrimaId: number;
+    nomeGlobal: string;
+    custoAtualProduto: number;
+    custoGlobal: number;
+  }> = [];
+
+  for (const mp of mps) {
+    const custoGlobal = parseFloat(mp.custoKg);
+    const linhasVinculadas = await db.select().from(produtoMateriasPrimas)
+      .where(eq(produtoMateriasPrimas.materiaPrimaId, mp.id));
+    for (const linha of linhasVinculadas) {
+      const custoAtual = parseFloat(linha.custoKg);
+      if (Math.abs(custoAtual - custoGlobal) > 0.0001) {
+        desatualizados.push({
+          produtoMpId: linha.id,
+          produtoId: linha.produtoId,
+          ordem: linha.ordem,
+          nomeProdutoMp: linha.nome,
+          materiaPrimaId: mp.id,
+          nomeGlobal: mp.nome,
+          custoAtualProduto: custoAtual,
+          custoGlobal,
+        });
+      }
+    }
+  }
+
+  return desatualizados;
 }

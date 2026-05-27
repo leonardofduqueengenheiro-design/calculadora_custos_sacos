@@ -13,9 +13,11 @@ import {
   Check,
   Pencil,
   Link2,
-  Link2Off,
   RefreshCw,
   Info,
+  AlertTriangle,
+  DollarSign,
+  Wrench,
 } from "lucide-react";
 
 const fmt = (v: number) =>
@@ -28,31 +30,53 @@ interface MpRow {
   nome: string;
   custoKg: string;
   percentualUso: string;
-  materiaPrimaId: number | null; // FK para o catálogo global
+  materiaPrimaId: number | null;
   saving: boolean;
 }
 
-// Catálogo global de MPs (vindo de Custos Variáveis)
 interface MpGlobal {
   id: number;
   nome: string;
   custoKg: number;
 }
 
+interface CustoDesatualizado {
+  produtoMpId: number;
+  produtoId: number;
+  ordem: number;
+  nomeProdutoMp: string;
+  materiaPrimaId: number;
+  nomeGlobal: string;
+  custoAtualProduto: number;
+  custoGlobal: number;
+}
+
 function ProdutoCard({
   produto,
   mpsGlobais,
+  desatualizados,
+  onCorrigir,
 }: {
   produto: any;
   mpsGlobais: MpGlobal[];
+  desatualizados: CustoDesatualizado[];
+  onCorrigir: (produtoId: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editingNome, setEditingNome] = useState(false);
   const [nomeEdit, setNomeEdit] = useState(produto.nome);
+  const [precoEdit, setPrecoEdit] = useState<string>(
+    produto.precoVendaPadrao != null ? produto.precoVendaPadrao.toFixed(2) : ""
+  );
+  const [savingPreco, setSavingPreco] = useState(false);
 
   useEffect(() => {
     if (!editingNome) setNomeEdit(produto.nome);
   }, [produto.nome, editingNome]);
+
+  useEffect(() => {
+    setPrecoEdit(produto.precoVendaPadrao != null ? produto.precoVendaPadrao.toFixed(2) : "");
+  }, [produto.precoVendaPadrao]);
 
   const [mps, setMps] = useState<MpRow[]>(
     Array.from({ length: 5 }, (_, i) => {
@@ -68,7 +92,6 @@ function ProdutoCard({
     })
   );
 
-  // Sincronizar estado local quando dados do servidor mudam
   useEffect(() => {
     setMps(
       Array.from({ length: 5 }, (_, i) => {
@@ -87,10 +110,15 @@ function ProdutoCard({
 
   const updateNomeMutation = trpc.produtos.updateNome.useMutation();
   const updateMpMutation = trpc.produtos.updateMp.useMutation();
+  const updatePrecoMutation = trpc.produtos.updatePreco.useMutation();
   const utils = trpc.useUtils();
 
   const totalPct = mps.reduce((s, m) => s + (parseFloat(m.percentualUso) || 0), 0);
   const pctOk = Math.abs(totalPct - 100) < 0.1 || totalPct === 0;
+
+  // MPs deste produto com custo desatualizado
+  const mpDesatualizadasDoProduto = desatualizados.filter(d => d.produtoId === produto.id);
+  const temDesatualizado = mpDesatualizadasDoProduto.length > 0;
 
   const handleSaveNome = async () => {
     if (!nomeEdit.trim()) return;
@@ -101,6 +129,23 @@ function ProdutoCard({
       toast.success("Nome atualizado!");
     } catch {
       toast.error("Erro ao salvar nome");
+    }
+  };
+
+  const handleSavePreco = async () => {
+    setSavingPreco(true);
+    try {
+      const preco = precoEdit.trim() === "" ? null : parseFloat(precoEdit);
+      await updatePrecoMutation.mutateAsync({
+        id: produto.id,
+        precoVendaPadrao: preco,
+      });
+      await utils.produtos.list.invalidate();
+      toast.success("Preço padrão salvo!");
+    } catch {
+      toast.error("Erro ao salvar preço");
+    } finally {
+      setSavingPreco(false);
     }
   };
 
@@ -117,6 +162,7 @@ function ProdutoCard({
         materiaPrimaId: mp.materiaPrimaId,
       });
       utils.produtos.list.invalidate();
+      utils.produtos.custosDesatualizados.invalidate();
       toast.success(`MP ${mp.ordem} salva!`);
     } catch {
       toast.error("Erro ao salvar matéria-prima");
@@ -129,10 +175,8 @@ function ProdutoCard({
     setMps(prev => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m));
   };
 
-  // Vincular uma linha de MP ao catálogo global
   const handleVincular = (idx: number, mpGlobalId: number | null) => {
     if (mpGlobalId === null) {
-      // Desvincular: libera edição manual
       setMps(prev => prev.map((m, i) => i === idx ? { ...m, materiaPrimaId: null } : m));
       return;
     }
@@ -140,12 +184,7 @@ function ProdutoCard({
     if (!mpGlobal) return;
     setMps(prev => prev.map((m, i) =>
       i === idx
-        ? {
-            ...m,
-            materiaPrimaId: mpGlobalId,
-            nome: mpGlobal.nome,
-            custoKg: mpGlobal.custoKg.toFixed(4),
-          }
+        ? { ...m, materiaPrimaId: mpGlobalId, nome: mpGlobal.nome, custoKg: mpGlobal.custoKg.toFixed(4) }
         : m
     ));
     toast.info(`MP vinculada a "${mpGlobal.nome}" — clique em Salvar para confirmar`);
@@ -181,13 +220,40 @@ function ProdutoCard({
                 >
                   <Pencil className="h-3 w-3" />
                 </button>
+                {temDesatualizado && (
+                  <Badge
+                    variant="destructive"
+                    className="text-xs gap-1 cursor-pointer"
+                    onClick={() => setExpanded(true)}
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    {mpDesatualizadasDoProduto.length} MP{mpDesatualizadasDoProduto.length > 1 ? "s" : ""} desatualizada{mpDesatualizadasDoProduto.length > 1 ? "s" : ""}
+                  </Badge>
+                )}
               </div>
             )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Preço de venda padrão */}
+            <div className="flex items-center gap-1.5">
+              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Preço padrão/kg"
+                value={precoEdit}
+                onChange={e => setPrecoEdit(e.target.value)}
+                onBlur={handleSavePreco}
+                onKeyDown={e => e.key === "Enter" && handleSavePreco()}
+                className="h-7 text-xs w-32 font-mono"
+                title="Preço de venda padrão (R$/kg) — pré-preenche Análise por Mix e Otimizador"
+              />
+              {savingPreco && <RefreshCw className="h-3 w-3 animate-spin text-primary" />}
+            </div>
             {produto.custoMpKg > 0 && (
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Custo MP ponderado</p>
+                <p className="text-xs text-muted-foreground">Custo MP</p>
                 <p className="text-sm font-mono font-bold text-primary">{fmt(produto.custoMpKg)}/kg</p>
               </div>
             )}
@@ -207,6 +273,37 @@ function ProdutoCard({
       {expanded && (
         <CardContent className="pt-0 space-y-4">
           <Separator />
+
+          {/* Alerta de custos desatualizados */}
+          {temDesatualizado && (
+            <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-400">Custos desatualizados detectados</p>
+                  <div className="mt-1 space-y-1">
+                    {mpDesatualizadasDoProduto.map(d => (
+                      <p key={d.produtoMpId} className="text-xs text-muted-foreground">
+                        <strong className="text-foreground">{d.nomeProdutoMp}</strong>: armazenado{" "}
+                        <span className="font-mono text-red-400">{fmt(d.custoAtualProduto)}/kg</span>
+                        {" "}→ catálogo{" "}
+                        <span className="font-mono text-emerald-400">{fmt(d.custoGlobal)}/kg</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10 flex-shrink-0"
+                onClick={() => onCorrigir(produto.id)}
+              >
+                <Wrench className="h-3 w-3" />
+                Corrigir
+              </Button>
+            </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -238,21 +335,35 @@ function ProdutoCard({
             <div className="space-y-2">
               {mps.map((mp, idx) => {
                 const vinculada = mp.materiaPrimaId !== null;
+                const desatualizada = desatualizados.some(
+                  d => d.produtoId === produto.id && d.ordem === mp.ordem
+                );
                 return (
                   <div
                     key={mp.ordem}
                     className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg transition-colors"
                     style={{
-                      background: vinculada ? "oklch(0.72 0.18 195 / 0.06)" : "transparent",
-                      border: vinculada ? "1px solid oklch(0.72 0.18 195 / 0.2)" : "1px solid transparent",
+                      background: desatualizada
+                        ? "oklch(0.75 0.18 80 / 0.06)"
+                        : vinculada
+                        ? "oklch(0.72 0.18 195 / 0.06)"
+                        : "transparent",
+                      border: desatualizada
+                        ? "1px solid oklch(0.75 0.18 80 / 0.3)"
+                        : vinculada
+                        ? "1px solid oklch(0.72 0.18 195 / 0.2)"
+                        : "1px solid transparent",
                     }}
                   >
-                    {/* Número */}
                     <div className="col-span-1">
-                      <span className="text-xs text-muted-foreground font-mono">{mp.ordem}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground font-mono">{mp.ordem}</span>
+                        {desatualizada && (
+                          <span title="Custo desatualizado"><AlertTriangle className="h-3 w-3 text-amber-400" /></span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Dropdown de vínculo ao catálogo */}
                     <div className="col-span-3">
                       <div className="flex items-center gap-1">
                         <select
@@ -272,13 +383,10 @@ function ProdutoCard({
                             </option>
                           ))}
                         </select>
-                        {vinculada && (
-                          <Link2 className="h-3 w-3 text-primary flex-shrink-0" />
-                        )}
+                        {vinculada && <Link2 className="h-3 w-3 text-primary flex-shrink-0" />}
                       </div>
                     </div>
 
-                    {/* Nome */}
                     <div className="col-span-3">
                       <Input
                         placeholder="Ex: PEAD virgem"
@@ -290,7 +398,6 @@ function ProdutoCard({
                       />
                     </div>
 
-                    {/* Custo */}
                     <div className="col-span-2">
                       <div className="relative">
                         <Input
@@ -305,17 +412,13 @@ function ProdutoCard({
                           style={vinculada ? { opacity: 0.7, cursor: "not-allowed" } : {}}
                         />
                         {vinculada && (
-                          <div
-                            className="absolute right-2 top-1/2 -translate-y-1/2"
-                            title="Custo sincronizado automaticamente com Custos Variáveis"
-                          >
-                            <RefreshCw className="h-3 w-3 text-primary" />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2" title="Custo sincronizado automaticamente">
+                            <span title="Custo sincronizado automaticamente"><RefreshCw className="h-3 w-3 text-primary" /></span>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Percentual */}
                     <div className="col-span-1">
                       <Input
                         type="number"
@@ -329,7 +432,6 @@ function ProdutoCard({
                       />
                     </div>
 
-                    {/* Salvar */}
                     <div className="col-span-2">
                       <Button
                         size="sm"
@@ -346,11 +448,10 @@ function ProdutoCard({
               })}
             </div>
 
-            {/* Nota sobre vínculo */}
             <div className="mt-3 p-3 rounded-md bg-primary/5 border border-primary/20 flex items-start gap-2">
               <Info className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
               <p className="text-xs text-muted-foreground">
-                <strong className="text-foreground">Vínculo automático:</strong> ao selecionar uma MP do catálogo (dropdown), o custo será atualizado automaticamente sempre que você alterar o valor em <strong className="text-foreground">Custos Variáveis</strong>. Linhas com <Link2 className="inline h-3 w-3 text-primary" /> têm custo somente-leitura e sincronizado.
+                <strong className="text-foreground">Vínculo automático:</strong> ao selecionar uma MP do catálogo, o custo é atualizado automaticamente ao salvar em <strong className="text-foreground">Custos Variáveis</strong>. Linhas com <Link2 className="inline h-3 w-3 text-primary" /> têm custo somente-leitura.
               </p>
             </div>
 
@@ -376,20 +477,41 @@ function ProdutoCard({
 export default function Produtos() {
   const { data: produtos, isLoading } = trpc.produtos.list.useQuery();
   const { data: mpsGlobais } = trpc.materiasPrimas.listParaVinculo.useQuery();
+  const { data: desatualizados = [] } = trpc.produtos.custosDesatualizados.useQuery();
   const syncCustosMutation = trpc.produtos.syncCustos.useMutation();
   const utils = trpc.useUtils();
+
+  const totalDesatualizados = desatualizados.length;
 
   const handleSyncCustos = async () => {
     try {
       const res = await syncCustosMutation.mutateAsync();
       await utils.produtos.list.invalidate();
+      await utils.produtos.custosDesatualizados.invalidate();
       if (res.linhasAtualizadas > 0) {
         toast.success(`${res.linhasAtualizadas} linha(s) de MP atualizada(s) com os custos atuais!`);
       } else {
-        toast.info("Nenhuma MP vinculada encontrada. Vincule MPs ao catálogo para sincronização automática.");
+        toast.info("Nenhuma MP vinculada encontrada.");
       }
     } catch {
       toast.error("Erro ao sincronizar custos");
+    }
+  };
+
+  const syncCustosProdutoMutation = trpc.produtos.syncCustosProduto.useMutation();
+
+  const handleCorrigirProduto = async (produtoId: number) => {
+    try {
+      const res = await syncCustosProdutoMutation.mutateAsync({ produtoId });
+      await utils.produtos.list.invalidate();
+      await utils.produtos.custosDesatualizados.invalidate();
+      if (res.linhasAtualizadas > 0) {
+        toast.success(`${res.linhasAtualizadas} MP(s) corrigida(s) para este produto!`);
+      } else {
+        toast.info("Nenhuma MP desatualizada encontrada para este produto.");
+      }
+    } catch {
+      toast.error("Erro ao corrigir custos");
     }
   };
 
@@ -407,33 +529,40 @@ export default function Produtos() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Configuração de Produtos</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Defina o nome e a composição de matérias-primas de cada produto. Vincule as MPs ao
-            catálogo global para que os custos sejam atualizados automaticamente.
+            Defina o nome, preço de venda padrão e composição de matérias-primas de cada produto.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSyncCustos}
-          disabled={syncCustosMutation.isPending}
-          className="gap-2 flex-shrink-0"
-        >
-          <RefreshCw className={`h-4 w-4 ${syncCustosMutation.isPending ? "animate-spin" : ""}`} />
-          Sincronizar Custos
-        </Button>
+        <div className="flex items-center gap-2">
+          {totalDesatualizados > 0 && (
+            <Badge variant="destructive" className="gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              {totalDesatualizados} desatualizado{totalDesatualizados > 1 ? "s" : ""}
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncCustos}
+            disabled={syncCustosMutation.isPending}
+            className="gap-2 flex-shrink-0"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncCustosMutation.isPending ? "animate-spin" : ""}`} />
+            Sincronizar Custos
+          </Button>
+        </div>
       </div>
 
       {/* Banner explicativo */}
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="pt-4">
           <div className="flex gap-3">
-            <Link2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <DollarSign className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div className="space-y-1">
-              <p className="text-sm font-medium text-primary">Como funciona a sincronização?</p>
+              <p className="text-sm font-medium text-primary">Preço de Venda Padrão</p>
               <p className="text-xs text-muted-foreground">
-                Cada linha de MP pode ser <strong className="text-foreground">vinculada</strong> a uma MP do catálogo global (aba <strong className="text-foreground">Custos Variáveis</strong>).
-                Quando vinculada, o custo por kg é atualizado automaticamente sempre que você salvar um novo valor em Custos Variáveis — sem precisar editar cada produto manualmente.
-                O percentual de uso (%) permanece editável em cada produto, pois pode variar conforme a fórmula de cada saco.
+                Informe o <strong className="text-foreground">preço de venda padrão (R$/kg)</strong> de cada produto no campo ao lado do nome.
+                Esse valor pré-preenche automaticamente a <strong className="text-foreground">Análise por Mix</strong> e o <strong className="text-foreground">Otimizador de Mix</strong>,
+                eliminando a necessidade de digitar os preços a cada uso. Você ainda pode ajustá-los manualmente nessas páginas quando necessário.
               </p>
             </div>
           </div>
@@ -446,6 +575,8 @@ export default function Produtos() {
             key={produto.id}
             produto={produto}
             mpsGlobais={mpsGlobais ?? []}
+            desatualizados={desatualizados}
+            onCorrigir={handleCorrigirProduto}
           />
         ))}
       </div>
@@ -453,10 +584,9 @@ export default function Produtos() {
       <Card className="border-border/30 bg-muted/20">
         <CardContent className="pt-4">
           <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Dica:</strong> Para cada produto, informe até 5 matérias-primas
-            com o custo por kg e o percentual de uso na mistura. A soma dos percentuais deve ser 100%.
+            <strong className="text-foreground">Dica:</strong> Para cada produto, informe até 5 matérias-primas com custo e percentual de uso (deve somar 100%).
             Use o dropdown <strong className="text-foreground">"Vincular ao Catálogo"</strong> para conectar cada MP ao registro global —
-            assim, ao atualizar o preço de compra em Custos Variáveis, todos os produtos são atualizados automaticamente.
+            assim, ao atualizar o preço em Custos Variáveis, todos os produtos são atualizados automaticamente.
           </p>
         </CardContent>
       </Card>

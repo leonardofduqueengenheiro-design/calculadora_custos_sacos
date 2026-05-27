@@ -21,6 +21,10 @@ import {
   upsertProdutoMp,
   getCustoPonderadoProduto,
   propagarCustoMpParaProdutos,
+  updatePrecoVendaPadrao,
+  registrarHistoricoCustoMp,
+  getHistoricoCustoMp,
+  getCustosDesatualizados,
   getAnalises,
   getAnaliseItens,
   saveAnalise,
@@ -390,14 +394,33 @@ const materiasPrimasRouter = router({
     }))
     .mutation(async ({ input }) => {
       const custoKgStr = input.custoKg.toFixed(4);
+      // Buscar custo anterior para registrar histórico
+      const mpsAtuais = await getMateriasPrimas();
+      const mpAtual = mpsAtuais.find(m => m.id === input.id);
       await upsertMateriaPrima(input.id, {
         nome: input.nome,
         custoKg: custoKgStr,
         percentualUso: input.percentualUso.toFixed(4),
       });
+      // Registrar histórico se o custo mudou
+      if (mpAtual && Math.abs(parseFloat(mpAtual.custoKg) - input.custoKg) > 0.0001) {
+        await registrarHistoricoCustoMp({
+          materiaPrimaId: input.id,
+          nomeMP: input.nome,
+          custoAnterior: mpAtual.custoKg,
+          custoNovo: custoKgStr,
+        });
+      }
       // Propagar automaticamente o novo custo para todos os produtos vinculados
       const linhasAfetadas = await propagarCustoMpParaProdutos(input.id, custoKgStr);
       return { success: true, linhasAfetadas };
+    }),
+
+  // Histórico de variação de custo de uma MP específica
+  historico: publicProcedure
+    .input(z.object({ materiaPrimaId: z.number() }))
+    .query(async ({ input }) => {
+      return getHistoricoCustoMp(input.materiaPrimaId);
     }),
 
   // Lista MPs com id para uso no dropdown de vínculo em Produtos
@@ -436,6 +459,7 @@ const produtosRouter = router({
       return {
         ...p,
         custoMpKg,
+        precoVendaPadrao: p.precoVendaPadrao ? parseFloat(p.precoVendaPadrao) : null,
         materiasPrimas: mps.map(m => ({
           id: m.id,
           ordem: m.ordem,
@@ -448,6 +472,25 @@ const produtosRouter = router({
     }));
     return result;
   }),
+
+  // Verificar MPs vinculadas com custo desatualizado
+  custosDesatualizados: publicProcedure.query(async () => {
+    return getCustosDesatualizados();
+  }),
+
+  // Atualizar preço de venda padrão de um produto
+  updatePreco: publicProcedure
+    .input(z.object({
+      id: z.number(),
+      precoVendaPadrao: z.number().min(0).nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      await updatePrecoVendaPadrao(
+        input.id,
+        input.precoVendaPadrao !== null ? input.precoVendaPadrao.toFixed(4) : null
+      );
+      return { success: true };
+    }),
 
   updateNome: publicProcedure
     .input(z.object({ id: z.number(), nome: z.string().min(1), descricao: z.string().optional() }))
@@ -487,6 +530,34 @@ const produtosRouter = router({
     }
     return { success: true, linhasAtualizadas: totalLinhas };
   }),
+
+  // Sincroniza apenas as MPs vinculadas de um produto específico
+  syncCustosProduto: publicProcedure
+    .input(z.object({ produtoId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await (await import("./db")).getDb();
+      if (!db) throw new Error("DB unavailable");
+      const { produtoMateriasPrimas: pmpTable } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const mps = await getMateriasPrimas();
+      const mpMap = new Map(mps.map(m => [m.id, m.custoKg]));
+      // Buscar MPs vinculadas do produto
+      const linhasProduto = await db.select().from(pmpTable)
+        .where(eq(pmpTable.produtoId, input.produtoId));
+      let linhasAtualizadas = 0;
+      for (const linha of linhasProduto) {
+        if (linha.materiaPrimaId && mpMap.has(linha.materiaPrimaId)) {
+          const custoGlobal = mpMap.get(linha.materiaPrimaId)!;
+          if (Math.abs(parseFloat(linha.custoKg) - parseFloat(custoGlobal)) > 0.0001) {
+            await db.update(pmpTable)
+              .set({ custoKg: custoGlobal })
+              .where(eq(pmpTable.id, linha.id));
+            linhasAtualizadas++;
+          }
+        }
+      }
+      return { success: true, linhasAtualizadas };
+    }),
 });
 
 const analisesRouter = router({

@@ -148,14 +148,14 @@ export default function OtimizadorMix() {
   const [resultado, setResultado] = useState<ResultadoOtimizacao | null>(null);
   const [chartView, setChartView] = useState<"barras" | "pizza">("barras");
 
-  // Inicializar inputs quando produtos carregam
+  // Inicializar inputs quando produtos carregam — pré-preenche preço padrão se configurado
   useMemo(() => {
     if (produtos && produtos.length > 0 && produtosInput.length === 0) {
       setProdutosInput(
         produtos.map(p => ({
           produtoId: p.id,
           produtoNome: p.nome,
-          precoVendaKg: "",
+          precoVendaKg: p.precoVendaPadrao != null ? p.precoVendaPadrao.toFixed(2) : "",
           custoMpKg: p.custoMpKg,
           kgAtual: "",
           kgMinimo: "",

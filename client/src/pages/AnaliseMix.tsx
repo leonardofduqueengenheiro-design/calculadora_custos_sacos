@@ -82,7 +82,7 @@ export default function AnaliseMix() {
   const [expandedProduto, setExpandedProduto] = useState<number | null>(null);
   const [showSalvar, setShowSalvar] = useState(false);
 
-  // Inicializar itens quando produtos carregam
+  // Inicializar itens quando produtos carregam — pré-preenche preço padrão se configurado
   useMemo(() => {
     if (produtos && itens.length === 0) {
       setItens(
@@ -90,7 +90,7 @@ export default function AnaliseMix() {
           produtoId: p.id,
           produtoNome: p.nome,
           kgProduzido: "",
-          precoVendaKg: "",
+          precoVendaKg: p.precoVendaPadrao != null ? p.precoVendaPadrao.toFixed(2) : "",
           custoMpKg: p.custoMpKg,
         }))
       );

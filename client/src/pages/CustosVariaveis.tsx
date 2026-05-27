@@ -2,12 +2,23 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatBRL } from "@/lib/format";
 import { toast } from "sonner";
-import { Save, Info, Percent, Package, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { Save, Info, Package, AlertTriangle, CheckCircle2, RefreshCw, History, X, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 // ─── Linha de Matéria-Prima ───────────────────────────────────────────────────
 type MP = { id: number; ordem: number; nome: string; custoKg: number; percentualUso: number };
 
-function MpRow({ mp, onSaved }: { mp: MP; onSaved: () => void }) {
+function MpRow({ mp, onSaved, onVerHistorico }: { mp: MP; onSaved: () => void; onVerHistorico: (mp: MP) => void }) {
   const [nome, setNome] = useState(mp.nome);
   const [custo, setCusto] = useState(mp.custoKg.toFixed(4));
   const [pct, setPct] = useState(mp.percentualUso.toFixed(2));
@@ -40,7 +51,7 @@ function MpRow({ mp, onSaved }: { mp: MP; onSaved: () => void }) {
     <div
       className="grid gap-3 items-center p-3 rounded-xl transition-all"
       style={{
-        gridTemplateColumns: "2rem 1fr 160px 130px 44px",
+        gridTemplateColumns: "2rem 1fr 160px 130px 44px 44px",
         background: dirty ? "oklch(0.25 0.06 140 / 0.4)" : "var(--muted)",
         border: `1px solid ${dirty ? "oklch(0.65 0.18 140 / 0.5)" : "var(--border)"}`,
       }}
@@ -100,6 +111,20 @@ function MpRow({ mp, onSaved }: { mp: MP; onSaved: () => void }) {
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }}>%</span>
       </div>
 
+      {/* Histórico */}
+      <button
+        onClick={() => onVerHistorico(mp)}
+        className="h-10 w-10 rounded-lg flex items-center justify-center transition-all"
+        title="Ver histórico de variação de custo"
+        style={{
+          background: "var(--secondary)",
+          color: "var(--secondary-foreground)",
+          opacity: 0.8,
+        }}
+      >
+        <History className="w-4 h-4" />
+      </button>
+
       {/* Salvar */}
       <button
         onClick={save}
@@ -121,6 +146,153 @@ function MpRow({ mp, onSaved }: { mp: MP; onSaved: () => void }) {
   );
 }
 
+// ─── Modal de Histórico de Custo ─────────────────────────────────────────────
+function HistoricoModal({ mp, open, onClose }: { mp: MP | null; open: boolean; onClose: () => void }) {
+  const { data: historico, isLoading } = trpc.materiasPrimas.historico.useQuery(
+    { materiaPrimaId: mp?.id ?? 0 },
+    { enabled: open && mp != null }
+  );
+
+  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 4 });
+  const fmtDate = (d: Date | string) => new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  // Dados para o gráfico — mais antigo primeiro
+  const chartData = historico
+    ? [...historico]
+        .reverse()
+        .map((h, i) => ({
+          idx: i + 1,
+          label: fmtDate(h.dataAlteracao),
+          custo: parseFloat(h.custoNovo),
+          custoAnterior: parseFloat(h.custoAnterior),
+        }))
+    : [];
+
+  // Adicionar o custo atual como último ponto
+  if (mp && chartData.length > 0) {
+    // já está incluído como custoNovo do último registro
+  }
+
+  const variacao = historico && historico.length > 0
+    ? parseFloat(historico[0].custoNovo) - parseFloat(historico[0].custoAnterior)
+    : null;
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="h-4 w-4 text-primary" />
+            Histórico de Custo — {mp?.nome}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading && (
+          <div className="flex items-center justify-center h-32">
+            <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {!isLoading && (!historico || historico.length === 0) && (
+          <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
+            <History className="h-8 w-8 opacity-30" />
+            <p className="text-sm">Nenhuma alteração registrada ainda.</p>
+            <p className="text-xs">O histórico é registrado automaticamente ao salvar um novo custo.</p>
+          </div>
+        )}
+
+        {!isLoading && historico && historico.length > 0 && (
+          <div className="space-y-4">
+            {/* KPI de última variação */}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+              <div>
+                <p className="text-xs text-muted-foreground">Última alteração</p>
+                <p className="text-sm font-medium">{fmtDate(historico[0].dataAlteracao)}</p>
+              </div>
+              <div className="ml-auto flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Anterior</p>
+                  <p className="text-sm font-mono text-red-400">{fmt(parseFloat(historico[0].custoAnterior))}/kg</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Novo</p>
+                  <p className="text-sm font-mono text-emerald-400">{fmt(parseFloat(historico[0].custoNovo))}/kg</p>
+                </div>
+                {variacao !== null && (
+                  <div className="flex items-center gap-1">
+                    {variacao > 0
+                      ? <TrendingUp className="h-4 w-4 text-red-400" />
+                      : variacao < 0
+                      ? <TrendingDown className="h-4 w-4 text-emerald-400" />
+                      : <Minus className="h-4 w-4 text-muted-foreground" />
+                    }
+                    <span className={`text-sm font-mono font-bold ${variacao > 0 ? "text-red-400" : variacao < 0 ? "text-emerald-400" : "text-muted-foreground"}`}>
+                      {variacao > 0 ? "+" : ""}{fmt(variacao)}/kg
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Gráfico de evolução */}
+            {chartData.length >= 2 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Evolução do custo (R$/kg)</p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="idx" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                      tickFormatter={v => `R$${v.toFixed(2)}`}
+                      width={60}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => [fmt(v), "Custo"]}
+                      labelFormatter={(l) => chartData[l - 1]?.label ?? ""}
+                      contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="custo"
+                      stroke="oklch(0.72 0.18 60)"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "oklch(0.72 0.18 60)" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Tabela de histórico */}
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              <p className="text-xs text-muted-foreground mb-2">Registro completo ({historico.length} alteração{historico.length !== 1 ? "ões" : ""})</p>
+              {historico.map((h, i) => {
+                const delta = parseFloat(h.custoNovo) - parseFloat(h.custoAnterior);
+                return (
+                  <div key={h.id} className="flex items-center justify-between p-2 rounded-md bg-muted/30 text-xs">
+                    <span className="text-muted-foreground">{fmtDate(h.dataAlteracao)}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-muted-foreground line-through">{fmt(parseFloat(h.custoAnterior))}</span>
+                      <span className="font-mono text-foreground font-medium">{fmt(parseFloat(h.custoNovo))}</span>
+                      <Badge
+                        variant={delta > 0 ? "destructive" : delta < 0 ? "default" : "secondary"}
+                        className="text-xs font-mono"
+                      >
+                        {delta > 0 ? "+" : ""}{fmt(delta)}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Card do SIMPLES ─────────────────────────────────────────────────────────
 function SimplesCard() {
   const { data: params, refetch } = trpc.parametros.list.useQuery();
@@ -129,75 +301,66 @@ function SimplesCard() {
   });
 
   const aliquota = params ? parseFloat(params.find(p => p.chave === "aliquota_simples")?.valor ?? "11") : 11;
-  const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(aliquota.toFixed(2));
+  const [dirty, setDirty] = useState(false);
 
-  useEffect(() => { if (!editing) setVal(aliquota.toFixed(2)); }, [aliquota, editing]);
+  useEffect(() => { setVal(aliquota.toFixed(2)); setDirty(false); }, [aliquota]);
 
   const save = () => {
-    const n = parseFloat(val.replace(",", "."));
-    if (isNaN(n) || n < 0 || n > 50) { toast.error("Alíquota deve ser entre 0% e 50%"); return; }
-    setParam.mutate({ chave: "aliquota_simples", valor: n });
-    setEditing(false);
+    const v = parseFloat(val.replace(",", "."));
+    if (isNaN(v) || v < 0 || v > 100) { toast.error("Alíquota deve ser entre 0 e 100"); return; }
+    setParam.mutate({ chave: "aliquota_simples", valor: v });
+    setDirty(false);
   };
 
   return (
     <div className="rounded-xl p-6 card-gradient" style={{ border: "1px solid var(--border)" }}>
-      <div className="flex items-start gap-4 mb-5">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: "oklch(0.65 0.18 240 / 0.15)", border: "1px solid oklch(0.65 0.18 240 / 0.25)" }}>
-          <Percent className="w-6 h-6" style={{ color: "oklch(0.65 0.18 240)" }} />
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          style={{ background: "oklch(0.72 0.18 240 / 0.15)", border: "1px solid oklch(0.72 0.18 240 / 0.25)" }}>
+          <Info className="w-5 h-5" style={{ color: "oklch(0.65 0.18 240)" }} />
         </div>
         <div>
-          <h3 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Alíquota do SIMPLES Nacional</h3>
-          <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
-            Percentual sobre o faturamento bruto. Incide diretamente sobre o preço de venda.
-          </p>
+          <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Simples Nacional</h2>
+          <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Alíquota aplicada sobre o preço de venda</p>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex-1 relative">
-          {editing ? (
-            <input
-              value={val}
-              onChange={e => setVal(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && save()}
-              autoFocus
-              className="w-full rounded-lg px-4 py-3 text-xl font-bold outline-none"
-              style={{ background: "oklch(0.97 0.05 80)", color: "var(--foreground)", border: "2px solid oklch(0.65 0.18 240)" }}
-            />
-          ) : (
-            <div
-              className="rounded-lg px-4 py-3 cursor-pointer transition-all"
-              style={{ background: "var(--muted)", border: "1px solid var(--border)" }}
-              onClick={() => setEditing(true)}
-            >
-              <span className="text-2xl font-bold" style={{ color: "oklch(0.72 0.18 60)" }}>{aliquota.toFixed(2)}%</span>
-            </div>
-          )}
+        <div className="relative flex-1 max-w-[180px]">
+          <input
+            value={val}
+            onChange={e => { setVal(e.target.value); setDirty(true); }}
+            placeholder="11,00"
+            className="w-full rounded-lg py-2 text-sm font-mono outline-none transition-all"
+            style={{
+              background: "var(--input)",
+              color: "oklch(0.72 0.18 240)",
+              border: `1px solid ${dirty ? "oklch(0.65 0.18 240 / 0.5)" : "var(--border)"}`,
+              paddingLeft: "0.75rem",
+              paddingRight: "2rem",
+              textAlign: "right",
+            }}
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }}>%</span>
         </div>
-        {editing ? (
-          <button
-            onClick={save}
-            className="px-4 py-3 rounded-lg text-sm font-medium"
-            style={{ background: "oklch(0.65 0.18 140)", color: "white" }}
-          >
-            <Save className="w-4 h-4" />
-          </button>
-        ) : (
-          <button
-            onClick={() => setEditing(true)}
-            className="px-4 py-3 rounded-lg text-sm font-medium"
-            style={{ background: "var(--secondary)", color: "var(--muted-foreground)", border: "1px solid var(--border)" }}
-          >
-            Editar
-          </button>
-        )}
+        <button
+          onClick={save}
+          disabled={!dirty || setParam.isPending}
+          className="h-10 w-10 rounded-lg flex items-center justify-center transition-all"
+          style={{
+            background: dirty ? "oklch(0.65 0.18 140)" : "var(--secondary)",
+            color: "white",
+            opacity: dirty ? 1 : 0.4,
+            cursor: dirty ? "pointer" : "not-allowed",
+          }}
+        >
+          {setParam.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        </button>
       </div>
 
-      <div className="mt-4 p-3 rounded-lg flex items-start gap-2"
-        style={{ background: "oklch(0.65 0.18 240 / 0.08)", border: "1px solid oklch(0.65 0.18 240 / 0.2)" }}>
+      <div className="mt-3 flex items-start gap-2 p-3 rounded-lg text-xs"
+        style={{ background: "var(--muted)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
         <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "oklch(0.65 0.18 240)" }} />
         <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
           Fórmula aplicada: <code className="px-1 rounded" style={{ background: "var(--muted)" }}>Margem = Preço − (Preço × {aliquota.toFixed(1)}%) − Custo Total</code>
@@ -212,6 +375,8 @@ export default function CustosVariaveis() {
   const { data: mps, refetch: refetchMps } = trpc.materiasPrimas.list.useQuery();
   const { data: ponderado, refetch: refetchPonderado } = trpc.materiasPrimas.custoMedioPonderado.useQuery();
   const { data: params } = trpc.parametros.list.useQuery();
+
+  const [historicoMp, setHistoricoMp] = useState<MP | null>(null);
 
   const totalPct = ponderado?.totalPercentual ?? 0;
   const custoMedio = ponderado?.custo ?? 0;
@@ -263,11 +428,12 @@ export default function CustosVariaveis() {
         </div>
 
         {/* Cabeçalho das colunas */}
-        <div className="grid gap-3 px-3 pb-2 text-xs font-medium" style={{ gridTemplateColumns: "2rem 1fr 160px 130px 44px", color: "var(--muted-foreground)" }}>
+        <div className="grid gap-3 px-3 pb-2 text-xs font-medium" style={{ gridTemplateColumns: "2rem 1fr 160px 130px 44px 44px", color: "var(--muted-foreground)" }}>
           <div />
           <span>Nome da Matéria-Prima</span>
           <span className="text-right pr-2">Custo (R$/kg)</span>
           <span className="text-right pr-6">% de Uso</span>
+          <span className="text-center">Hist.</span>
           <div />
         </div>
 
@@ -279,6 +445,7 @@ export default function CustosVariaveis() {
                   key={mp.id}
                   mp={{ id: mp.id, ordem: mp.ordem, nome: mp.nome, custoKg: parseFloat(mp.custoKg), percentualUso: parseFloat(mp.percentualUso) }}
                   onSaved={onSaved}
+                  onVerHistorico={setHistoricoMp}
                 />
               ))
             : Array.from({ length: 5 }).map((_, i) => (
@@ -321,7 +488,7 @@ export default function CustosVariaveis() {
           style={{ background: "var(--muted)", border: "1px solid var(--border)", color: "var(--muted-foreground)" }}>
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--primary)" }} />
           <span>
-            Preencha o nome, custo por kg e o percentual de uso de cada matéria-prima. Matérias-primas com percentual 0% não influenciam no custo médio ponderado. Clique no ícone de salvar (verde) em cada linha após editar.
+            Preencha o nome, custo por kg e o percentual de uso de cada matéria-prima. Clique em <History className="inline w-3 h-3" /> para ver o histórico de variação de custo de cada MP. Clique no ícone de salvar (verde) após editar.
           </span>
         </div>
       </div>
@@ -350,6 +517,13 @@ export default function CustosVariaveis() {
           ))}
         </div>
       </div>
+
+      {/* Modal de Histórico */}
+      <HistoricoModal
+        mp={historicoMp}
+        open={historicoMp !== null}
+        onClose={() => setHistoricoMp(null)}
+      />
     </div>
   );
 }

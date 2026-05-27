@@ -97,3 +97,27 @@
 - [x] Frontend: botão "Sincronizar Custos" na página de Produtos para forçar atualização manual
 - [x] Frontend: banner explicativo sobre o funcionamento do vínculo automático
 - [x] 44 testes passando (sem regressões)
+
+## Novas Funcionalidades (v10)
+
+### Alerta de Custo Desatualizado
+- [x] Backend: procedure `produtos.custosDesatualizados` compara custo armazenado vs catálogo global para MPs vinculadas
+- [x] Frontend: badge de aviso em cada produto com MP desatualizada na página Produtos
+- [x] Frontend: botão "Corrigir" que aplica o custo atual do catálogo para a linha desatualizada
+
+### Preço de Venda Padrão por Produto
+- [x] Schema: adicionar coluna `preco_venda_padrao` (decimal) na tabela `produtos`
+- [x] Backend: migração SQL para adicionar a coluna
+- [x] Backend: procedure `produtos.updatePreco` para salvar o preço padrão
+- [x] Frontend: campo de preço de venda padrão na página Produtos (por produto)
+- [x] Frontend: Análise por Mix pré-preenche o preço de venda com o valor padrão do produto
+- [x] Frontend: Otimizador de Mix pré-preenche o preço de venda com o valor padrão do produto
+
+### Histórico de Variação de Custo de MP
+- [x] Schema: nova tabela `historico_custo_mp` com campos: id, materia_prima_id, nome_mp, custo_anterior, custo_novo, data_alteracao
+- [x] Backend: migração SQL para criar a tabela
+- [x] Backend: ao salvar uma MP em `materiasPrimas.update`, registrar o histórico se o custo mudou
+- [x] Backend: procedure `materiasPrimas.historico` para listar o histórico de uma MP
+- [x] Frontend: botão "Ver Histórico" (aba) em cada MP na página Custos Variáveis
+- [x] Frontend: modal com tabela de histórico e gráfico de linha de variação de custo ao longo do tempo
+- [x] 49 testes passando (sem regressões)
