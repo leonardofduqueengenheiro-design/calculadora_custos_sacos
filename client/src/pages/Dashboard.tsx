@@ -1,11 +1,22 @@
 import { trpc } from "@/lib/trpc";
-import { formatBRL, formatPercent, formatKg, formatNumber } from "@/lib/format";
+import { formatBRL, formatPercent, formatKg } from "@/lib/format";
 import {
   TrendingUp, TrendingDown, DollarSign, Package,
   BarChart3, Layers, ArrowRight, RefreshCw
 } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+} from "recharts";
 
 function KpiCard({
   title,
@@ -83,6 +94,44 @@ function CustoBar({ label, valor, total, cor }: { label: string; valor: number; 
   );
 }
 
+// Tooltip customizado para o gráfico break-even
+function BreakEvenTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div
+      className="rounded-lg p-3 text-xs shadow-xl"
+      style={{
+        background: "var(--card)",
+        border: "1px solid var(--border)",
+        color: "var(--foreground)",
+        minWidth: 180,
+      }}
+    >
+      <p className="font-semibold mb-2" style={{ color: "var(--muted-foreground)" }}>
+        Volume: {Number(label).toLocaleString("pt-BR")} kg
+      </p>
+      {payload.map((entry: any) => (
+        <div key={entry.name} className="flex justify-between gap-4">
+          <span style={{ color: entry.color }}>{entry.name}</span>
+          <span className="font-medium tabular-nums">{formatBRL(entry.value, 0)}</span>
+        </div>
+      ))}
+      {payload.length === 2 && (
+        <div className="mt-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+          <div className="flex justify-between gap-4">
+            <span style={{ color: payload[0].value > payload[1].value ? "oklch(0.70 0.18 155)" : "oklch(0.65 0.22 25)" }}>
+              {payload[0].value > payload[1].value ? "Lucro" : "Prejuízo"}
+            </span>
+            <span className="font-bold tabular-nums" style={{ color: payload[0].value > payload[1].value ? "oklch(0.70 0.18 155)" : "oklch(0.65 0.22 25)" }}>
+              {formatBRL(Math.abs(payload[0].value - payload[1].value), 0)}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { data: resumo, isLoading, refetch } = trpc.calculo.resumo.useQuery();
   const { data: custos } = trpc.custos.list.useQuery();
@@ -133,6 +182,38 @@ export default function Dashboard() {
   };
 
   const totalCustos = resumo.totalFixosMensal + resumo.custoMpKg * resumo.producaoMensal;
+
+  // ─── Dados do Break-Even Chart ────────────────────────────────────────────
+  // Custo Total = Custos Fixos Mensais + (Custo MP/kg × Volume)
+  // Receita Total = Preço de Venda × Volume × (1 - alíquota SIMPLES)
+  // Ponto de equilíbrio: volume onde Receita = Custo Total
+  const custoFixoMensal = resumo.totalFixosMensal;
+  const custoVarKg = resumo.custoMpKg; // custo variável por kg (MP)
+  const receitaLiquidaKg = resumo.precoVenda * (1 - resumo.aliquotaSimples / 100); // receita líquida por kg (descontando SIMPLES)
+
+  // Volume do ponto de equilíbrio: CustoFixo + CustoVar*V = ReceitaLiq*V
+  // CustoFixo = (ReceitaLiq - CustoVar) * V
+  // V = CustoFixo / (ReceitaLiq - CustoVar)
+  const margemContribuicaoKg = receitaLiquidaKg - custoVarKg;
+  const volumeBreakEven = margemContribuicaoKg > 0
+    ? Math.round(custoFixoMensal / margemContribuicaoKg)
+    : null;
+
+  // Gerar pontos do gráfico: de 0 até 2× a produção mensal atual
+  const maxVolume = Math.max(resumo.producaoMensal * 2, volumeBreakEven ? volumeBreakEven * 1.5 : resumo.producaoMensal * 2);
+  const steps = 10;
+  const stepSize = Math.round(maxVolume / steps);
+
+  const breakEvenData = Array.from({ length: steps + 1 }, (_, i) => {
+    const volume = i * stepSize;
+    const receitaTotal = receitaLiquidaKg * volume;
+    const custoTotal = custoFixoMensal + custoVarKg * volume;
+    return {
+      volume,
+      "Receita Líquida": Math.round(receitaTotal),
+      "Custo Total": Math.round(custoTotal),
+    };
+  });
 
   return (
     <div className="space-y-8">
@@ -196,6 +277,165 @@ export default function Dashboard() {
           accentColor={resumo.margemMensal > 0 ? "oklch(0.70 0.18 155)" : "oklch(0.65 0.22 25)"}
           delay={240}
         />
+      </div>
+
+      {/* Break-Even Chart — linha inteira */}
+      <div
+        className="rounded-xl p-6 card-gradient animate-fade-in-up"
+        style={{ border: "1px solid var(--border)", animationDelay: "300ms" }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
+              Ponto de Equilíbrio — Break-Even Chart
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+              Cruzamento entre Receita Líquida e Custo Total por volume de produção mensal (kg)
+            </p>
+          </div>
+
+          {/* Indicadores do break-even */}
+          <div className="flex flex-wrap gap-3">
+            <div
+              className="rounded-lg px-4 py-2 text-center"
+              style={{ background: "oklch(0.70 0.18 155 / 0.10)", border: "1px solid oklch(0.70 0.18 155 / 0.25)" }}
+            >
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Ponto de Equilíbrio</p>
+              <p className="text-sm font-bold tabular-nums" style={{ color: "oklch(0.70 0.18 155)" }}>
+                {volumeBreakEven != null ? `${volumeBreakEven.toLocaleString("pt-BR")} kg` : "—"}
+              </p>
+            </div>
+            <div
+              className="rounded-lg px-4 py-2 text-center"
+              style={{ background: "oklch(0.72 0.18 195 / 0.10)", border: "1px solid oklch(0.72 0.18 195 / 0.25)" }}
+            >
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Produção Atual</p>
+              <p className="text-sm font-bold tabular-nums" style={{ color: "oklch(0.72 0.18 195)" }}>
+                {formatKg(resumo.producaoMensal)}
+              </p>
+            </div>
+            <div
+              className="rounded-lg px-4 py-2 text-center"
+              style={{
+                background: isLucrativo ? "oklch(0.70 0.18 155 / 0.10)" : "oklch(0.65 0.22 25 / 0.10)",
+                border: `1px solid ${isLucrativo ? "oklch(0.70 0.18 155 / 0.25)" : "oklch(0.65 0.22 25 / 0.25)"}`,
+              }}
+            >
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                {volumeBreakEven != null && resumo.producaoMensal > volumeBreakEven ? "Folga acima do PE" : "Déficit abaixo do PE"}
+              </p>
+              <p className="text-sm font-bold tabular-nums" style={{ color: isLucrativo ? "oklch(0.70 0.18 155)" : "oklch(0.65 0.22 25)" }}>
+                {volumeBreakEven != null
+                  ? `${Math.abs(resumo.producaoMensal - volumeBreakEven).toLocaleString("pt-BR")} kg`
+                  : "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={breakEvenData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="oklch(0.35 0.01 260)"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="volume"
+              tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+              tick={{ fill: "oklch(0.55 0.01 260)", fontSize: 11 }}
+              axisLine={{ stroke: "oklch(0.35 0.01 260)" }}
+              tickLine={false}
+              label={{
+                value: "Volume (kg/mês)",
+                position: "insideBottom",
+                offset: -2,
+                fill: "oklch(0.50 0.01 260)",
+                fontSize: 11,
+              }}
+            />
+            <YAxis
+              tickFormatter={(v) =>
+                v >= 1_000_000
+                  ? `R$${(v / 1_000_000).toFixed(1)}M`
+                  : `R$${(v / 1_000).toFixed(0)}k`
+              }
+              tick={{ fill: "oklch(0.55 0.01 260)", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              width={72}
+            />
+            <Tooltip content={<BreakEvenTooltip />} />
+            <Legend
+              wrapperStyle={{ fontSize: 12, paddingTop: 16, color: "oklch(0.65 0.01 260)" }}
+            />
+
+            {/* Linha vertical no ponto de equilíbrio */}
+            {volumeBreakEven != null && (
+              <ReferenceLine
+                x={volumeBreakEven}
+                stroke="oklch(0.78 0.18 75)"
+                strokeDasharray="5 4"
+                strokeWidth={1.5}
+                label={{
+                  value: `PE: ${(volumeBreakEven / 1000).toFixed(1)}k kg`,
+                  position: "top",
+                  fill: "oklch(0.78 0.18 75)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              />
+            )}
+
+            {/* Linha vertical na produção atual */}
+            <ReferenceLine
+              x={resumo.producaoMensal}
+              stroke="oklch(0.72 0.18 195)"
+              strokeDasharray="5 4"
+              strokeWidth={1.5}
+              label={{
+                value: `Atual: ${(resumo.producaoMensal / 1000).toFixed(1)}k kg`,
+                position: "insideTopRight",
+                fill: "oklch(0.72 0.18 195)",
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            />
+
+            <Line
+              type="monotone"
+              dataKey="Receita Líquida"
+              stroke="oklch(0.70 0.18 155)"
+              strokeWidth={2.5}
+              dot={false}
+              activeDot={{ r: 5, fill: "oklch(0.70 0.18 155)" }}
+            />
+            <Line
+              type="monotone"
+              dataKey="Custo Total"
+              stroke="oklch(0.65 0.22 25)"
+              strokeWidth={2.5}
+              dot={false}
+              activeDot={{ r: 5, fill: "oklch(0.65 0.22 25)" }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+
+        {/* Legenda explicativa */}
+        <div className="mt-4 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3" style={{ borderTop: "1px solid var(--border)" }}>
+          <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+            <span className="font-medium" style={{ color: "oklch(0.70 0.18 155)" }}>Receita Líquida</span>
+            {" "}= Preço de Venda × Volume × (1 − SIMPLES {resumo.aliquotaSimples}%)
+          </div>
+          <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+            <span className="font-medium" style={{ color: "oklch(0.65 0.22 25)" }}>Custo Total</span>
+            {" "}= Custos Fixos ({formatBRL(custoFixoMensal, 0)}/mês) + MP ({formatBRL(custoVarKg, 4)}/kg × Volume)
+          </div>
+          <div className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+            <span className="font-medium" style={{ color: "oklch(0.78 0.18 75)" }}>Ponto de Equilíbrio</span>
+            {" "}= volume mínimo para cobrir todos os custos sem lucro nem prejuízo
+          </div>
+        </div>
       </div>
 
       {/* Segunda linha */}
@@ -291,7 +531,7 @@ export default function Dashboard() {
               {[
                 { label: "Matéria-Prima", valor: resumo.custoMpKg, cor: "oklch(0.72 0.18 25)" },
                 { label: "Custos Fixos", valor: resumo.custoFixoKg, cor: "oklch(0.72 0.18 195)" },
-                { label: "SIMPLES (11%)", valor: resumo.simplesKg, cor: "oklch(0.65 0.18 240)" },
+                { label: `SIMPLES (${resumo.aliquotaSimples}%)`, valor: resumo.simplesKg, cor: "oklch(0.65 0.18 240)" },
                 { label: "Margem", valor: resumo.margemUnitaria, cor: resumo.margemUnitaria > 0 ? "oklch(0.70 0.18 155)" : "oklch(0.65 0.22 25)" },
               ].map(({ label, valor, cor }) => (
                 <div key={label} className="flex items-center gap-2">

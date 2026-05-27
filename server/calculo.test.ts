@@ -167,3 +167,64 @@ describe("Dados reais do cliente", () => {
     expect(precoMinimo).toBeGreaterThan(24);
   });
 });
+
+// Lógica do Break-Even Chart (replicada do Dashboard)
+function calcularBreakEven(
+  custoFixoMensal: number,
+  custoVarKg: number,
+  precoVenda: number,
+  aliquotaSimples: number
+): number | null {
+  const receitaLiquidaKg = precoVenda * (1 - aliquotaSimples / 100);
+  const margemContribuicaoKg = receitaLiquidaKg - custoVarKg;
+  if (margemContribuicaoKg <= 0) return null;
+  return custoFixoMensal / margemContribuicaoKg;
+}
+
+describe("Break-Even Chart — Ponto de Equilíbrio", () => {
+  it("calcula o volume de equilíbrio corretamente", () => {
+    // custoFixo=150000, custoVar=7.37/kg, preço=24, simples=11%
+    // receitaLiq = 24 * 0.89 = 21.36
+    // margemContrib = 21.36 - 7.37 = 13.99
+    // PE = 150000 / 13.99 ≈ 10722 kg
+    const pe = calcularBreakEven(150000, 7.37, 24, 11);
+    expect(pe).not.toBeNull();
+    expect(pe!).toBeCloseTo(150000 / (24 * 0.89 - 7.37), 0);
+  });
+
+  it("retorna null quando margem de contribuição é zero ou negativa", () => {
+    // preço líquido = custo variável → sem contribuição para fixos
+    const pe = calcularBreakEven(100000, 21.36, 24, 11); // 24*0.89=21.36 = custoVar
+    expect(pe).toBeNull();
+  });
+
+  it("produção acima do PE gera lucro positivo", () => {
+    const pe = calcularBreakEven(150000, 7.37, 24, 11)!;
+    const producaoAcima = pe * 1.5;
+    const receitaLiq = 24 * 0.89 * producaoAcima;
+    const custoTotal = 150000 + 7.37 * producaoAcima;
+    expect(receitaLiq).toBeGreaterThan(custoTotal);
+  });
+
+  it("produção abaixo do PE gera prejuízo", () => {
+    const pe = calcularBreakEven(150000, 7.37, 24, 11)!;
+    const producaoAbaixo = pe * 0.5;
+    const receitaLiq = 24 * 0.89 * producaoAbaixo;
+    const custoTotal = 150000 + 7.37 * producaoAbaixo;
+    expect(receitaLiq).toBeLessThan(custoTotal);
+  });
+
+  it("no ponto de equilíbrio receita ≈ custo total", () => {
+    const pe = calcularBreakEven(150000, 7.37, 24, 11)!;
+    const receitaLiq = 24 * 0.89 * pe;
+    const custoTotal = 150000 + 7.37 * pe;
+    expect(Math.abs(receitaLiq - custoTotal)).toBeLessThan(1); // diferença < R$1
+  });
+
+  it("com dados reais do cliente, PE é menor que produção atual", () => {
+    const pe = calcularBreakEven(259487, 7.0541, 24, 11)!;
+    const producaoAtual = 31498;
+    expect(pe).toBeGreaterThan(0);
+    expect(producaoAtual).toBeGreaterThan(pe); // produção atual acima do PE = lucrativo
+  });
+});

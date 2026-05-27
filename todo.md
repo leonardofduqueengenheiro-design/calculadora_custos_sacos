@@ -42,3 +42,7 @@
 - [x] Frontend: página Custos Variáveis com 5 campos de MP (nome, R$/kg, % uso)
 - [x] Frontend: exibição do custo médio ponderado calculado automaticamente
 - [x] Validação: soma dos percentuais deve ser 100%
+
+## Novas Funcionalidades (v4)
+
+- [x] Dashboard: Gráfico de Ponto de Equilíbrio (Break-Even Chart) com cruzamento de Receita Total x Custo Total
