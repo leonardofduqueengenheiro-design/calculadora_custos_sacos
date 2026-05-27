@@ -566,3 +566,64 @@ describe("Otimizador de Mix de Produção", () => {
     expect(somaTotal).toBeCloseTo(volumeTotal, 0);
   });
 });
+
+// ─── Sincronização de Custos de MP entre Catálogo e Produtos ─────────────────
+
+/**
+ * Simula a lógica de propagação de custo: dado um mapa de materiaPrimaId → novoCusto,
+ * atualiza as linhas de produto_materias_primas que têm esse vínculo.
+ */
+function propagarCustosSimulado(
+  linhasProduto: { ordem: number; nome: string; custoKg: number; materiaPrimaId: number | null }[],
+  atualizacoes: Record<number, number> // materiaPrimaId → novoCustoKg
+) {
+  return linhasProduto.map(linha => {
+    if (linha.materiaPrimaId !== null && atualizacoes[linha.materiaPrimaId] !== undefined) {
+      return { ...linha, custoKg: atualizacoes[linha.materiaPrimaId] };
+    }
+    return linha;
+  });
+}
+
+describe("Sincronização de Custos de MP", () => {
+  const linhasBase = [
+    { ordem: 1, nome: "PEAD virgem", custoKg: 7.00, materiaPrimaId: 1 },
+    { ordem: 2, nome: "Reciclado", custoKg: 4.50, materiaPrimaId: 2 },
+    { ordem: 3, nome: "Aditivo", custoKg: 12.00, materiaPrimaId: null }, // manual, sem vínculo
+  ];
+
+  it("atualiza apenas as linhas vinculadas ao catálogo", () => {
+    const resultado = propagarCustosSimulado(linhasBase, { 1: 7.80 });
+    expect(resultado[0].custoKg).toBeCloseTo(7.80, 2);
+    expect(resultado[1].custoKg).toBeCloseTo(4.50, 2); // não alterado
+    expect(resultado[2].custoKg).toBeCloseTo(12.00, 2); // manual, não alterado
+  });
+
+  it("não altera linhas sem vínculo (materiaPrimaId null)", () => {
+    const resultado = propagarCustosSimulado(linhasBase, { 1: 8.00, 2: 5.00 });
+    expect(resultado[2].custoKg).toBeCloseTo(12.00, 2);
+    expect(resultado[2].materiaPrimaId).toBeNull();
+  });
+
+  it("atualiza múltiplas MPs ao mesmo tempo", () => {
+    const resultado = propagarCustosSimulado(linhasBase, { 1: 9.00, 2: 6.00 });
+    expect(resultado[0].custoKg).toBeCloseTo(9.00, 2);
+    expect(resultado[1].custoKg).toBeCloseTo(6.00, 2);
+  });
+
+  it("custo ponderado recalculado após propagação reflete novo valor", () => {
+    const percentuais = [60, 30, 10]; // % de uso de cada MP
+    const linhasAtualizadas = propagarCustosSimulado(linhasBase, { 1: 8.00 });
+    const custoTotal = linhasAtualizadas.reduce((s, l, i) => s + l.custoKg * percentuais[i], 0);
+    const custoMedio = custoTotal / 100;
+    // 8.00*60% + 4.50*30% + 12.00*10% = 4.80 + 1.35 + 1.20 = 7.35
+    expect(custoMedio).toBeCloseTo(7.35, 2);
+  });
+
+  it("sem atualizações, nenhuma linha é alterada", () => {
+    const resultado = propagarCustosSimulado(linhasBase, {});
+    expect(resultado[0].custoKg).toBeCloseTo(7.00, 2);
+    expect(resultado[1].custoKg).toBeCloseTo(4.50, 2);
+    expect(resultado[2].custoKg).toBeCloseTo(12.00, 2);
+  });
+});

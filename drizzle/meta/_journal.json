@@ -29,6 +29,13 @@
       "when": 1779889149187,
       "tag": "0003_abandoned_starbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1779899085544,
+      "tag": "0004_curvy_enchantress",
+      "breakpoints": true
     }
   ]
 }

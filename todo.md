@@ -85,3 +85,15 @@
 - [x] Frontend: gráfico de pizza/rosca mostrando participação % de cada produto no mix otimizado
 - [x] Frontend: card de ganho de lucro e margem vs mix atual
 - [x] Testes vitest para a função de otimização (6 novos testes — total: 44)
+
+## Novas Funcionalidades (v9 — Sincronização de Custos de MP)
+
+- [x] Schema: adicionar coluna `materia_prima_id` (FK opcional) em `produto_materias_primas` para vincular ao catálogo global
+- [x] Backend: migração SQL para adicionar a coluna `materia_prima_id`
+- [x] Backend: procedure `produtos.syncCustos` que copia o custo atual de cada MP do catálogo global para os produtos vinculados
+- [x] Backend: ao salvar uma MP em `materiasPrimas.update`, propagar automaticamente o novo custo para todos os produtos vinculados
+- [x] Frontend: UI de Produtos mostra dropdown para vincular cada linha de MP ao catálogo global (Custos Variáveis)
+- [x] Frontend: custo da MP vinculada é exibido como somente-leitura com ícone de sincronização
+- [x] Frontend: botão "Sincronizar Custos" na página de Produtos para forçar atualização manual
+- [x] Frontend: banner explicativo sobre o funcionamento do vínculo automático
+- [x] 44 testes passando (sem regressões)

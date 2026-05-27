@@ -1,0 +1,1 @@
+ALTER TABLE `produto_materias_primas` ADD `materia_prima_id` int;

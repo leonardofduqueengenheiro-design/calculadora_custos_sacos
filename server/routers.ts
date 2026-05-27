@@ -20,6 +20,7 @@ import {
   getProdutoMateriasPrimas,
   upsertProdutoMp,
   getCustoPonderadoProduto,
+  propagarCustoMpParaProdutos,
   getAnalises,
   getAnaliseItens,
   saveAnalise,
@@ -388,13 +389,22 @@ const materiasPrimasRouter = router({
       percentualUso: z.number().min(0).max(100),
     }))
     .mutation(async ({ input }) => {
+      const custoKgStr = input.custoKg.toFixed(4);
       await upsertMateriaPrima(input.id, {
         nome: input.nome,
-        custoKg: input.custoKg.toFixed(4),
+        custoKg: custoKgStr,
         percentualUso: input.percentualUso.toFixed(4),
       });
-      return { success: true };
+      // Propagar automaticamente o novo custo para todos os produtos vinculados
+      const linhasAfetadas = await propagarCustoMpParaProdutos(input.id, custoKgStr);
+      return { success: true, linhasAfetadas };
     }),
+
+  // Lista MPs com id para uso no dropdown de vínculo em Produtos
+  listParaVinculo: publicProcedure.query(async () => {
+    const mps = await getMateriasPrimas();
+    return mps.map(m => ({ id: m.id, nome: m.nome, custoKg: parseFloat(m.custoKg) }));
+  }),
 
   custoMedioPonderado: publicProcedure.query(async () => {
     const custo = await getCustoMpPonderado();
@@ -432,6 +442,7 @@ const produtosRouter = router({
           nome: m.nome,
           custoKg: parseFloat(m.custoKg),
           percentualUso: parseFloat(m.percentualUso),
+          materiaPrimaId: m.materiaPrimaId ?? null, // FK para o catálogo global
         })),
       };
     }));
@@ -452,6 +463,7 @@ const produtosRouter = router({
       nome: z.string(),
       custoKg: z.number().min(0),
       percentualUso: z.number().min(0).max(100),
+      materiaPrimaId: z.number().nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       await upsertProdutoMp({
@@ -460,9 +472,21 @@ const produtosRouter = router({
         nome: input.nome,
         custoKg: input.custoKg.toFixed(4),
         percentualUso: input.percentualUso.toFixed(4),
+        materiaPrimaId: input.materiaPrimaId ?? null,
       });
       return { success: true };
     }),
+
+  // Sincroniza manualmente todos os custos de MPs vinculadas em todos os produtos
+  syncCustos: publicProcedure.mutation(async () => {
+    const mps = await getMateriasPrimas();
+    let totalLinhas = 0;
+    for (const mp of mps) {
+      const linhas = await propagarCustoMpParaProdutos(mp.id, mp.custoKg);
+      totalLinhas += linhas;
+    }
+    return { success: true, linhasAtualizadas: totalLinhas };
+  }),
 });
 
 const analisesRouter = router({

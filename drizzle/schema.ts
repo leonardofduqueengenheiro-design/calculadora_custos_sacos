@@ -113,6 +113,9 @@ export const produtoMateriasPrimas = mysqlTable("produto_materias_primas", {
   nome: varchar("nome", { length: 100 }).notNull(),
   custoKg: decimal("custo_kg", { precision: 15, scale: 4 }).notNull().default("0"),
   percentualUso: decimal("percentual_uso", { precision: 8, scale: 4 }).notNull().default("0"),
+  // FK opcional para o catálogo global de MPs (Custos Variáveis)
+  // Quando preenchido, o custo é sincronizado automaticamente ao salvar a MP global
+  materiaPrimaId: int("materia_prima_id"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

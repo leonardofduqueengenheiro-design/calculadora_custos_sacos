@@ -199,6 +199,7 @@ export async function upsertProdutoMp(data: {
   nome: string;
   custoKg: string;
   percentualUso: string;
+  materiaPrimaId?: number | null;
 }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -208,11 +209,37 @@ export async function upsertProdutoMp(data: {
     .then(rows => rows.find(r => r.ordem === data.ordem));
   if (existing) {
     await db.update(produtoMateriasPrimas)
-      .set({ nome: data.nome, custoKg: data.custoKg, percentualUso: data.percentualUso })
+      .set({
+        nome: data.nome,
+        custoKg: data.custoKg,
+        percentualUso: data.percentualUso,
+        materiaPrimaId: data.materiaPrimaId ?? null,
+      })
       .where(eq(produtoMateriasPrimas.id, existing.id));
   } else {
-    await db.insert(produtoMateriasPrimas).values(data);
+    await db.insert(produtoMateriasPrimas).values({
+      produtoId: data.produtoId,
+      ordem: data.ordem,
+      nome: data.nome,
+      custoKg: data.custoKg,
+      percentualUso: data.percentualUso,
+      materiaPrimaId: data.materiaPrimaId ?? null,
+    });
   }
+}
+
+/**
+ * Propaga o novo custo de uma MP global para todos os produtos que a referenciam.
+ * Chamado automaticamente após salvar uma MP em Custos Variáveis.
+ */
+export async function propagarCustoMpParaProdutos(materiaPrimaId: number, novoCustoKg: string): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.update(produtoMateriasPrimas)
+    .set({ custoKg: novoCustoKg })
+    .where(eq(produtoMateriasPrimas.materiaPrimaId, materiaPrimaId));
+  // Retorna o número de linhas afetadas
+  return (result as any)[0]?.affectedRows ?? 0;
 }
 
 export async function getCustoPonderadoProduto(produtoId: number): Promise<number> {
