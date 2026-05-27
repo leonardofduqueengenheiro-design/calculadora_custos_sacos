@@ -174,7 +174,8 @@ const calculoRouter = router({
 
       const totalFixos = custos.reduce((sum, c) => sum + parseFloat(c.valorMensal), 0);
       const producaoMensal = paramMap['producao_mensal_kg'] ?? 31498;
-      const custoMpKg = paramMap['custo_mp_kg'] ?? 8.234;
+      const custoMpKgPonderado = await getCustoMpPonderado();
+      const custoMpKg = custoMpKgPonderado > 0 ? custoMpKgPonderado : (paramMap['custo_mp_kg'] ?? 7.37);
       const aliquotaSimples = paramMap['aliquota_simples'] ?? 11;
       const estoque = paramMap['estoque_atual_kg'] ?? 100000;
 
@@ -223,7 +224,8 @@ const calculoRouter = router({
 
       const totalFixos = custos.reduce((sum, c) => sum + parseFloat(c.valorMensal), 0);
       const producaoMensal = paramMap['producao_mensal_kg'] ?? 31498;
-      const custoMpKg = paramMap['custo_mp_kg'] ?? 8.234;
+      const custoMpKgPonderado2 = await getCustoMpPonderado();
+      const custoMpKg = custoMpKgPonderado2 > 0 ? custoMpKgPonderado2 : (paramMap['custo_mp_kg'] ?? 7.37);
       const aliquotaSimples = paramMap['aliquota_simples'] ?? 11;
       const estoque = paramMap['estoque_atual_kg'] ?? 100000;
 
@@ -273,7 +275,8 @@ const calculoRouter = router({
 
       const totalFixos = custos.reduce((sum, c) => sum + parseFloat(c.valorMensal), 0);
       const producaoMensal = paramMap['producao_mensal_kg'] ?? 31498;
-      const custoMpKg = paramMap['custo_mp_kg'] ?? 8.234;
+      const custoMpKgPonderado3 = await getCustoMpPonderado();
+      const custoMpKg = custoMpKgPonderado3 > 0 ? custoMpKgPonderado3 : (paramMap['custo_mp_kg'] ?? 7.37);
       const aliquotaSimples = paramMap['aliquota_simples'] ?? 11;
       const precoBase = input.precoBase ?? paramMap['preco_venda_atual'] ?? 24;
 

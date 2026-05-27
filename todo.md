@@ -36,9 +36,9 @@
 
 ## Novas Funcionalidades (v3)
 
-- [ ] Banco de dados: tabela materias_primas com campos nome, custo_kg, percentual_uso
-- [ ] Backend: rotas tRPC para CRUD de múltiplas matérias-primas (até 5)
-- [ ] Backend: cálculo de custo médio ponderado de MP
-- [ ] Frontend: página Custos Variáveis com 5 campos de MP (nome, R$/kg, % uso)
-- [ ] Frontend: exibição do custo médio ponderado calculado automaticamente
-- [ ] Validação: soma dos percentuais deve ser 100%
+- [x] Banco de dados: tabela materias_primas com campos nome, custo_kg, percentual_uso
+- [x] Backend: rotas tRPC para CRUD de múltiplas matérias-primas (até 5)
+- [x] Backend: cálculo de custo médio ponderado de MP
+- [x] Frontend: página Custos Variáveis com 5 campos de MP (nome, R$/kg, % uso)
+- [x] Frontend: exibição do custo médio ponderado calculado automaticamente
+- [x] Validação: soma dos percentuais deve ser 100%
