@@ -42,6 +42,9 @@ interface ResultadoItem {
   custoMpKg: number;
   custoFixoKg: number;
   energiaVariavelKg: number;
+  combustivelVariavelKg: number;
+  freteVariavelKg: number;
+  totalVariavelKg: number;
   custoTotalKg: number;
   simplesKg: number;
   margemUnitaria: number;
@@ -57,7 +60,10 @@ interface ResultadoCalculo {
   totalLucro: number;
   margemConsolidada: number;
   custoFixoKg: number;
+  totalVariavelKg: number;
   energiaVariavelKg: number;
+  combustivelVariavelKg: number;
+  freteVariavelKg: number;
   aliquotaSimples: number;
 }
 
@@ -348,16 +354,50 @@ export default function AnaliseMix() {
           </div>
 
           {/* Custo fixo e energia variável */}
+          {/* Nota explicativa sobre Custeio por Absorção */}
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardContent className="pt-4">
+              <div className="flex gap-3">
+                <Info className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-amber-300">Custeio por Absorção — Rateio de Custos Fixos</p>
+                  <p className="text-xs text-muted-foreground">
+                    Os custos fixos mensais (R$ {resultado.custoFixoKg > 0 ? (resultado.custoFixoKg * resultado.totalKg).toLocaleString('pt-BR', {style:'currency',currency:'BRL'}) : '—'}) são rateados pelo <strong className="text-foreground">volume total real do mix ({resultado.totalKg.toLocaleString('pt-BR', {minimumFractionDigits:0})} kg)</strong>, resultando em {fmt(resultado.custoFixoKg)}/kg.
+                    Quanto maior o volume total produzido, menor o custo fixo por kg — e melhor a margem de todos os produtos.
+                    Isso é o método de Custeio por Absorção: produzir mais dilui os custos fixos entre todos os produtos.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Os custos variáveis (energia, combustível e frete) também variam com o volume real: quanto mais se produz, maior o consumo total, mas o custo por kg permanece constante.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Detalhamento de custos por kg */}
           <Card className="border-border/50">
             <CardContent className="pt-4">
-              <div className="flex flex-wrap gap-4 text-sm">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-3">Composição do Custo por kg (base: {resultado.totalKg.toLocaleString('pt-BR')} kg totais)</p>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Custo Fixo/kg (rateado): </span>
+                  <span className="text-muted-foreground">Custo Fixo rateado: </span>
                   <span className="font-mono text-foreground font-medium">{fmt(resultado.custoFixoKg)}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Energia Variável/kg (80%): </span>
+                  <span className="text-muted-foreground">Energia variável: </span>
                   <span className="font-mono text-foreground font-medium">{fmt(resultado.energiaVariavelKg)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Combustível variável: </span>
+                  <span className="font-mono text-foreground font-medium">{fmt(resultado.combustivelVariavelKg)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Frete variável: </span>
+                  <span className="font-mono text-foreground font-medium">{fmt(resultado.freteVariavelKg)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total variável/kg: </span>
+                  <span className="font-mono text-primary font-semibold">{fmt(resultado.totalVariavelKg)}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">SIMPLES: </span>

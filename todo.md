@@ -67,3 +67,10 @@
 - [x] Parâmetros: campos de percentual fixo/variável para combustível e frete
 - [x] Lógica de cálculo: combustível e frete variáveis entram no custo por kg
 - [x] Break-Even Chart: atualizar para incluir combustível e frete variáveis
+
+## Novas Funcionalidades (v7)
+
+- [x] Backend: combustível e frete variáveis na Análise por Mix usam volume real do mix (não produção média)
+- [x] UI: Análise por Mix exibe nota explicativa sobre rateio de custos fixos (Custeio por Absorção)
+- [x] UI: Análise por Mix mostra custo fixo/kg recalculado com base no volume total do mix
+- [x] UI: Análise por Mix exibe detalhamento separado de energia, combustível e frete variáveis por kg

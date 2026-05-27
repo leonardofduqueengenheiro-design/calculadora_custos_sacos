@@ -488,21 +488,24 @@ const analisesRouter = router({
       for (const p of params) paramMap[p.chave] = parseFloat(p.valor);
       const aliquotaSimples = paramMap['aliquota_simples'] ?? 11;
       const energiaPercentualFixo = paramMap['energia_percentual_fixo'] ?? 20;
+      const combustivelPercentualFixo = paramMap['combustivel_percentual_fixo'] ?? 30;
+      const fretePercentualFixo = paramMap['frete_percentual_fixo'] ?? 40;
       const totalKg = input.itens.reduce((s, i) => s + i.kgProduzido, 0);
       if (totalKg <= 0) throw new Error('Total de kg deve ser maior que zero');
-      const { totalFixos, energiaVariavelKg } = calcularCustosComEnergiaMista(custos, energiaPercentualFixo, totalKg);
+      // Usa o volume REAL do mix (totalKg) para calcular custos variáveis — Custeio por Absorção
+      const { totalFixos, totalVariavelKg, energiaVariavelKg, combustivelVariavelKg, freteVariavelKg } = calcularCustosMistos(custos, energiaPercentualFixo, combustivelPercentualFixo, fretePercentualFixo, totalKg);
       const custoFixoKg = calcularCustoFixoKg(totalFixos, totalKg);
       const resultadoPorProduto = input.itens.map(item => {
-        const custoTotalKg = calcularCustoTotalKg(custoFixoKg, item.custoMpKg, energiaVariavelKg);
+        const custoTotalKg = calcularCustoTotalKg(custoFixoKg, item.custoMpKg, totalVariavelKg);
         const { margemUnitaria, margemPercentual, simplesKg } = calcularMargem(item.precoVendaKg, custoTotalKg, aliquotaSimples);
         const faturamento = item.precoVendaKg * item.kgProduzido;
         const lucro = margemUnitaria * item.kgProduzido;
-        return { produtoId: item.produtoId, produtoNome: item.produtoNome, kgProduzido: item.kgProduzido, precoVendaKg: item.precoVendaKg, custoMpKg: item.custoMpKg, custoFixoKg, energiaVariavelKg, custoTotalKg, simplesKg, margemUnitaria, margemPercentual, faturamento, lucro };
+        return { produtoId: item.produtoId, produtoNome: item.produtoNome, kgProduzido: item.kgProduzido, precoVendaKg: item.precoVendaKg, custoMpKg: item.custoMpKg, custoFixoKg, energiaVariavelKg, combustivelVariavelKg, freteVariavelKg, totalVariavelKg, custoTotalKg, simplesKg, margemUnitaria, margemPercentual, faturamento, lucro };
       });
       const totalFaturamento = resultadoPorProduto.reduce((s, r) => s + r.faturamento, 0);
       const totalLucro = resultadoPorProduto.reduce((s, r) => s + r.lucro, 0);
       const margemConsolidada = totalFaturamento > 0 ? (totalLucro / totalFaturamento) * 100 : 0;
-      return { resultadoPorProduto, totalKg, totalFaturamento, totalLucro, margemConsolidada, custoFixoKg, energiaVariavelKg, aliquotaSimples };
+      return { resultadoPorProduto, totalKg, totalFaturamento, totalLucro, margemConsolidada, custoFixoKg, totalVariavelKg, energiaVariavelKg, combustivelVariavelKg, freteVariavelKg, aliquotaSimples };
     }),
 
   salvar: publicProcedure
