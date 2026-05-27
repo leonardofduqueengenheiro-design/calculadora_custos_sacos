@@ -9,6 +9,8 @@ import {
   Factory,
   ChevronRight,
   Upload,
+  Package,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +50,18 @@ const navItems = [
     label: "Histórico",
     icon: History,
     description: "Simulações salvas",
+  },
+  {
+    href: "/produtos",
+    label: "Produtos",
+    icon: Package,
+    description: "Composição de MPs",
+  },
+  {
+    href: "/analise-mix",
+    label: "Análise por Mix",
+    icon: BarChart3,
+    description: "Margem por produto",
   },
   {
     href: "/importar",

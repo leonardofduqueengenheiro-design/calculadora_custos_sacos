@@ -11,6 +11,8 @@ import Parametros from "./pages/Parametros";
 import Simulador from "./pages/Simulador";
 import Historico from "./pages/Historico";
 import Importar from "./pages/Importar";
+import Produtos from "./pages/Produtos";
+import AnaliseMix from "./pages/AnaliseMix";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -24,6 +26,8 @@ function Router() {
         <Route path="/simulador" component={Simulador} />
         <Route path="/historico" component={Historico} />
         <Route path="/importar" component={Importar} />
+        <Route path="/produtos" component={Produtos} />
+        <Route path="/analise-mix" component={AnaliseMix} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

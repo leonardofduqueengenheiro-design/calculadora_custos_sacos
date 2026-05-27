@@ -46,3 +46,15 @@
 ## Novas Funcionalidades (v4)
 
 - [x] Dashboard: Gráfico de Ponto de Equilíbrio (Break-Even Chart) com cruzamento de Receita Total x Custo Total
+
+## Novas Funcionalidades (v5)
+
+- [ ] Energia elétrica: separar em parcela fixa (20%) e variável (80% por kg produzido)
+- [ ] Parâmetros: campo de percentual fixo/variável da energia editável
+- [ ] Lógica de cálculo: custo variável de energia entra no custo por kg junto com MP
+- [ ] Break-Even Chart: atualizar para incluir energia variável no custo variável por kg
+- [ ] DB: tabela produtos com nome, composição de MP própria (até 5 MPs com %)
+- [ ] Backend: rotas tRPC para CRUD de produtos e análise de mix
+- [ ] Página Mix de Produtos: cadastro de até 4 produtos com nome, MPs e percentuais
+- [ ] Página Análise de Período: informar kg produzido/vendido e preço por produto, ver margem individual e consolidada
+- [ ] Dashboard: indicador de custo variável de energia por kg

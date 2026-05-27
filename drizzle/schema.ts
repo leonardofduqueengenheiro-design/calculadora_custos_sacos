@@ -90,3 +90,58 @@ export const materiasPrimas = mysqlTable("materias_primas", {
 
 export type MateriaPrima = typeof materiasPrimas.$inferSelect;
 export type InsertMateriaPrima = typeof materiasPrimas.$inferInsert;
+
+// Produtos (até 4 tipos de sacos plásticos)
+export const produtos = mysqlTable("produtos", {
+  id: int("id").autoincrement().primaryKey(),
+  ordem: int("ordem").notNull().default(1),
+  nome: varchar("nome", { length: 150 }).notNull(),
+  descricao: text("descricao"),
+  ativo: int("ativo").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Produto = typeof produtos.$inferSelect;
+export type InsertProduto = typeof produtos.$inferInsert;
+
+// Composição de MP por produto (cada produto pode ter até 5 MPs com percentuais)
+export const produtoMateriasPrimas = mysqlTable("produto_materias_primas", {
+  id: int("id").autoincrement().primaryKey(),
+  produtoId: int("produto_id").notNull(),
+  ordem: int("ordem").notNull().default(1),
+  nome: varchar("nome", { length: 100 }).notNull(),
+  custoKg: decimal("custo_kg", { precision: 15, scale: 4 }).notNull().default("0"),
+  percentualUso: decimal("percentual_uso", { precision: 8, scale: 4 }).notNull().default("0"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ProdutoMateriaPrima = typeof produtoMateriasPrimas.$inferSelect;
+export type InsertProdutoMateriaPrima = typeof produtoMateriasPrimas.$inferInsert;
+
+// Análises de período (mix de produtos)
+export const analisesPeriodo = mysqlTable("analises_periodo", {
+  id: int("id").autoincrement().primaryKey(),
+  descricao: varchar("descricao", { length: 255 }).notNull(),
+  periodoInicio: varchar("periodo_inicio", { length: 20 }),
+  periodoFim: varchar("periodo_fim", { length: 20 }),
+  observacao: text("observacao"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AnalisePeriodo = typeof analisesPeriodo.$inferSelect;
+export type InsertAnalisePeriodo = typeof analisesPeriodo.$inferInsert;
+
+// Itens de cada análise de período
+export const analiseItens = mysqlTable("analise_itens", {
+  id: int("id").autoincrement().primaryKey(),
+  analiseId: int("analise_id").notNull(),
+  produtoId: int("produto_id").notNull(),
+  produtoNome: varchar("produto_nome", { length: 150 }).notNull(),
+  kgProduzido: decimal("kg_produzido", { precision: 15, scale: 2 }).notNull().default("0"),
+  precoVendaKg: decimal("preco_venda_kg", { precision: 15, scale: 4 }).notNull().default("0"),
+  custoMpKg: decimal("custo_mp_kg", { precision: 15, scale: 4 }).notNull().default("0"),
+});
+
+export type AnaliseItem = typeof analiseItens.$inferSelect;
+export type InsertAnaliseItem = typeof analiseItens.$inferInsert;

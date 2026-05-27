@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, custosFixos, materiasPrimas, parametros, simulacoes, users } from "../drizzle/schema";
+import { InsertUser, analiseItens, analisesPeriodo, custosFixos, materiasPrimas, parametros, produtoMateriasPrimas, produtos, simulacoes, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -167,4 +167,111 @@ export async function deleteSimulacao(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   await db.delete(simulacoes).where(eq(simulacoes.id, id));
+}
+
+// ─── Produtos ───────────────────────────────────────────────────────────────────────────────
+
+export async function getProdutos() {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.select().from(produtos).where(eq(produtos.ativo, 1));
+  return result.sort((a, b) => a.ordem - b.ordem);
+}
+
+export async function upsertProduto(id: number, data: { nome: string; descricao?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(produtos)
+    .set({ nome: data.nome, descricao: data.descricao ?? null })
+    .where(eq(produtos.id, id));
+}
+
+export async function getProdutoMateriasPrimas(produtoId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.select().from(produtoMateriasPrimas).where(eq(produtoMateriasPrimas.produtoId, produtoId));
+  return result.sort((a, b) => a.ordem - b.ordem);
+}
+
+export async function upsertProdutoMp(data: {
+  produtoId: number;
+  ordem: number;
+  nome: string;
+  custoKg: string;
+  percentualUso: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  // Verifica se já existe registro para esse produto+ordem
+  const existing = await db.select().from(produtoMateriasPrimas)
+    .where(eq(produtoMateriasPrimas.produtoId, data.produtoId))
+    .then(rows => rows.find(r => r.ordem === data.ordem));
+  if (existing) {
+    await db.update(produtoMateriasPrimas)
+      .set({ nome: data.nome, custoKg: data.custoKg, percentualUso: data.percentualUso })
+      .where(eq(produtoMateriasPrimas.id, existing.id));
+  } else {
+    await db.insert(produtoMateriasPrimas).values(data);
+  }
+}
+
+export async function getCustoPonderadoProduto(produtoId: number): Promise<number> {
+  const mps = await getProdutoMateriasPrimas(produtoId);
+  if (mps.length === 0) return 0;
+  const totalPct = mps.reduce((s, m) => s + parseFloat(m.percentualUso), 0);
+  if (totalPct <= 0) return 0;
+  const ponderado = mps.reduce((s, m) => s + parseFloat(m.custoKg) * parseFloat(m.percentualUso), 0);
+  return ponderado / totalPct;
+}
+
+// ─── Análises de Período ─────────────────────────────────────────────────────────────────
+
+export async function getAnalises() {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.select().from(analisesPeriodo);
+  return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export async function getAnaliseItens(analiseId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(analiseItens).where(eq(analiseItens.analiseId, analiseId));
+}
+
+export async function saveAnalise(data: {
+  descricao: string;
+  periodoInicio?: string;
+  periodoFim?: string;
+  observacao?: string;
+  itens: Array<{
+    produtoId: number;
+    produtoNome: string;
+    kgProduzido: string;
+    precoVendaKg: string;
+    custoMpKg: string;
+  }>;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.insert(analisesPeriodo).values({
+    descricao: data.descricao,
+    periodoInicio: data.periodoInicio,
+    periodoFim: data.periodoFim,
+    observacao: data.observacao,
+  });
+  const analiseId = (result as any)[0]?.insertId;
+  if (analiseId && data.itens.length > 0) {
+    await db.insert(analiseItens).values(
+      data.itens.map(item => ({ ...item, analiseId }))
+    );
+  }
+  return analiseId;
+}
+
+export async function deleteAnalise(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.delete(analiseItens).where(eq(analiseItens.analiseId, id));
+  await db.delete(analisesPeriodo).where(eq(analisesPeriodo.id, id));
 }

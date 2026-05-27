@@ -2,7 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatBRL, formatKg } from "@/lib/format";
 import { toast } from "sonner";
-import { Save, Factory, Package, Calendar, Sun } from "lucide-react";
+import { Save, Factory, Package, Calendar, Sun, Zap } from "lucide-react";
 
 function ParamField({
   label,
@@ -96,6 +96,7 @@ export default function Parametros() {
   const producaoDiaria = paramMap['producao_diaria_kg'] ?? 1500;
   const estoque = paramMap['estoque_atual_kg'] ?? 100000;
   const precoVenda = paramMap['preco_venda_atual'] ?? 24;
+  const energiaPercentualFixo = paramMap['energia_percentual_fixo'] ?? 20;
 
   const handleSave = (chave: string, valor: number) => {
     setParam.mutate({ chave, valor });
@@ -124,6 +125,41 @@ export default function Parametros() {
           </div>
           <ParamField label="Produção Média Mensal" chave="producao_mensal_kg" value={producaoMensal} suffix="kg/mês" step={100} description="Quantidade média de sacos plásticos produzidos por mês em kg" onSave={handleSave} />
           <ParamField label="Produção Média Diária" chave="producao_diaria_kg" value={producaoDiaria} suffix="kg/dia" step={50} description="Quantidade média de sacos plásticos produzidos por dia em kg" onSave={handleSave} />
+        </div>
+
+        {/* Energia Mista */}
+        <div className="rounded-xl p-6 card-gradient space-y-5" style={{ border: "1px solid var(--border)" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.72 0.18 120 / 0.15)", border: "1px solid oklch(0.72 0.18 120 / 0.25)" }}>
+              <Zap className="w-5 h-5" style={{ color: "oklch(0.72 0.18 120)" }} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Energia Elétrica</h2>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Distribuição entre custo fixo e variável</p>
+            </div>
+          </div>
+          <ParamField
+            label="Percentual Fixo da Energia"
+            chave="energia_percentual_fixo"
+            value={energiaPercentualFixo}
+            suffix="%"
+            step={5}
+            min={0}
+            description={`Parte da conta de energia que é fixa (estrutura/iluminação). O restante (${100 - energiaPercentualFixo}%) é variável e proporcional à produção.`}
+            onSave={handleSave}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg p-3 text-center" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Energia Fixa</p>
+              <p className="text-lg font-bold" style={{ color: "var(--foreground)" }}>{energiaPercentualFixo}%</p>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Vai para custo fixo/kg</p>
+            </div>
+            <div className="rounded-lg p-3 text-center" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Energia Variável</p>
+              <p className="text-lg font-bold" style={{ color: "oklch(0.72 0.18 120)" }}>{100 - energiaPercentualFixo}%</p>
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Proporcional à produção</p>
+            </div>
+          </div>
         </div>
 
         {/* Estoque e Preço */}

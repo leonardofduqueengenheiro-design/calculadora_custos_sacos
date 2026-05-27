@@ -15,17 +15,48 @@ import {
   getMateriasPrimas,
   upsertMateriaPrima,
   getCustoMpPonderado,
+  getProdutos,
+  upsertProduto,
+  getProdutoMateriasPrimas,
+  upsertProdutoMp,
+  getCustoPonderadoProduto,
+  getAnalises,
+  getAnaliseItens,
+  saveAnalise,
+  deleteAnalise,
 } from "./db";
 
 // ─── Lógica de cálculo financeiro ────────────────────────────────────────────
+
+/**
+ * Energia mista: parte fixa vai para custos fixos, parte variável é custo por kg.
+ */
+function calcularCustosComEnergiaMista(
+  custos: Array<{ categoria: string; valorMensal: string }>,
+  energiaPercentualFixo: number,
+  producaoMensal: number
+) {
+  const totalEnergia = custos
+    .filter(c => c.categoria === 'energia')
+    .reduce((s, c) => s + parseFloat(c.valorMensal), 0);
+  const totalSemEnergia = custos
+    .filter(c => c.categoria !== 'energia')
+    .reduce((s, c) => s + parseFloat(c.valorMensal), 0);
+  const pctFixo = Math.min(Math.max(energiaPercentualFixo, 0), 100) / 100;
+  const energiaFixaMensal = totalEnergia * pctFixo;
+  const energiaVariavelMensal = totalEnergia * (1 - pctFixo);
+  const energiaVariavelKg = producaoMensal > 0 ? energiaVariavelMensal / producaoMensal : 0;
+  const totalFixos = totalSemEnergia + energiaFixaMensal;
+  return { totalFixos, energiaVariavelKg, totalEnergia, energiaFixaMensal };
+}
 
 function calcularCustoFixoKg(totalFixos: number, producaoMensal: number): number {
   if (producaoMensal <= 0) return 0;
   return totalFixos / producaoMensal;
 }
 
-function calcularCustoTotalKg(custoFixoKg: number, custoMpKg: number): number {
-  return custoFixoKg + custoMpKg;
+function calcularCustoTotalKg(custoFixoKg: number, custoMpKg: number, energiaVariavelKg = 0): number {
+  return custoFixoKg + custoMpKg + energiaVariavelKg;
 }
 
 /**
@@ -114,8 +145,10 @@ const calculoRouter = router({
     const paramMap: Record<string, number> = {};
     for (const p of params) paramMap[p.chave] = parseFloat(p.valor);
 
-    const totalFixos = custos.reduce((sum, c) => sum + parseFloat(c.valorMensal), 0);
     const producaoMensal = paramMap['producao_mensal_kg'] ?? 31498;
+    const energiaPercentualFixo = paramMap['energia_percentual_fixo'] ?? 20;
+    const { totalFixos, energiaVariavelKg } = calcularCustosComEnergiaMista(custos, energiaPercentualFixo, producaoMensal);
+
     const custoMpKgPonderado = await getCustoMpPonderado();
     const custoMpKg = custoMpKgPonderado > 0 ? custoMpKgPonderado : (paramMap['custo_mp_kg'] ?? 7.37);
     const aliquotaSimples = paramMap['aliquota_simples'] ?? 11;
@@ -125,7 +158,7 @@ const calculoRouter = router({
     const mps = await getMateriasPrimas();
 
     const custoFixoKg = calcularCustoFixoKg(totalFixos, producaoMensal);
-    const custoTotalKg = calcularCustoTotalKg(custoFixoKg, custoMpKg);
+    const custoTotalKg = calcularCustoTotalKg(custoFixoKg, custoMpKg, energiaVariavelKg);
     const { margemUnitaria, margemPercentual, simplesKg } = calcularMargem(precoVenda, custoTotalKg, aliquotaSimples);
     const margemMensal = margemUnitaria * producaoMensal;
     const faturamentoMensal = precoVenda * producaoMensal;
@@ -137,6 +170,8 @@ const calculoRouter = router({
       totalFixosMensal: totalFixos,
       custoFixoKg,
       custoMpKg,
+      energiaVariavelKg,
+      energiaPercentualFixo,
       custoTotalKg,
       aliquotaSimples,
       precoVenda,
@@ -344,6 +379,121 @@ const simulacoesRouter = router({
     }),
 });
 
+const produtosRouter = router({
+  list: publicProcedure.query(async () => {
+    const prods = await getProdutos();
+    const result = await Promise.all(prods.map(async p => {
+      const mps = await getProdutoMateriasPrimas(p.id);
+      const custoMpKg = await getCustoPonderadoProduto(p.id);
+      return {
+        ...p,
+        custoMpKg,
+        materiasPrimas: mps.map(m => ({
+          id: m.id,
+          ordem: m.ordem,
+          nome: m.nome,
+          custoKg: parseFloat(m.custoKg),
+          percentualUso: parseFloat(m.percentualUso),
+        })),
+      };
+    }));
+    return result;
+  }),
+
+  updateNome: publicProcedure
+    .input(z.object({ id: z.number(), nome: z.string().min(1), descricao: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      await upsertProduto(input.id, { nome: input.nome, descricao: input.descricao });
+      return { success: true };
+    }),
+
+  updateMp: publicProcedure
+    .input(z.object({
+      produtoId: z.number(),
+      ordem: z.number().min(1).max(5),
+      nome: z.string(),
+      custoKg: z.number().min(0),
+      percentualUso: z.number().min(0).max(100),
+    }))
+    .mutation(async ({ input }) => {
+      await upsertProdutoMp({
+        produtoId: input.produtoId,
+        ordem: input.ordem,
+        nome: input.nome,
+        custoKg: input.custoKg.toFixed(4),
+        percentualUso: input.percentualUso.toFixed(4),
+      });
+      return { success: true };
+    }),
+});
+
+const analisesRouter = router({
+  list: publicProcedure.query(async () => getAnalises()),
+
+  getItens: publicProcedure
+    .input(z.object({ analiseId: z.number() }))
+    .query(async ({ input }) => getAnaliseItens(input.analiseId)),
+
+  calcular: publicProcedure
+    .input(z.object({
+      itens: z.array(z.object({
+        produtoId: z.number(),
+        produtoNome: z.string(),
+        kgProduzido: z.number().min(0),
+        precoVendaKg: z.number().min(0),
+        custoMpKg: z.number().min(0),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      const [custos, params] = await Promise.all([getCustosFixos(), getParametros()]);
+      const paramMap: Record<string, number> = {};
+      for (const p of params) paramMap[p.chave] = parseFloat(p.valor);
+      const aliquotaSimples = paramMap['aliquota_simples'] ?? 11;
+      const energiaPercentualFixo = paramMap['energia_percentual_fixo'] ?? 20;
+      const totalKg = input.itens.reduce((s, i) => s + i.kgProduzido, 0);
+      if (totalKg <= 0) throw new Error('Total de kg deve ser maior que zero');
+      const { totalFixos, energiaVariavelKg } = calcularCustosComEnergiaMista(custos, energiaPercentualFixo, totalKg);
+      const custoFixoKg = calcularCustoFixoKg(totalFixos, totalKg);
+      const resultadoPorProduto = input.itens.map(item => {
+        const custoTotalKg = calcularCustoTotalKg(custoFixoKg, item.custoMpKg, energiaVariavelKg);
+        const { margemUnitaria, margemPercentual, simplesKg } = calcularMargem(item.precoVendaKg, custoTotalKg, aliquotaSimples);
+        const faturamento = item.precoVendaKg * item.kgProduzido;
+        const lucro = margemUnitaria * item.kgProduzido;
+        return { produtoId: item.produtoId, produtoNome: item.produtoNome, kgProduzido: item.kgProduzido, precoVendaKg: item.precoVendaKg, custoMpKg: item.custoMpKg, custoFixoKg, energiaVariavelKg, custoTotalKg, simplesKg, margemUnitaria, margemPercentual, faturamento, lucro };
+      });
+      const totalFaturamento = resultadoPorProduto.reduce((s, r) => s + r.faturamento, 0);
+      const totalLucro = resultadoPorProduto.reduce((s, r) => s + r.lucro, 0);
+      const margemConsolidada = totalFaturamento > 0 ? (totalLucro / totalFaturamento) * 100 : 0;
+      return { resultadoPorProduto, totalKg, totalFaturamento, totalLucro, margemConsolidada, custoFixoKg, energiaVariavelKg, aliquotaSimples };
+    }),
+
+  salvar: publicProcedure
+    .input(z.object({
+      descricao: z.string().min(1),
+      periodoInicio: z.string().optional(),
+      periodoFim: z.string().optional(),
+      observacao: z.string().optional(),
+      itens: z.array(z.object({
+        produtoId: z.number(),
+        produtoNome: z.string(),
+        kgProduzido: z.number().min(0),
+        precoVendaKg: z.number().min(0),
+        custoMpKg: z.number().min(0),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      const id = await saveAnalise({
+        ...input,
+        itens: input.itens.map(i => ({ ...i, kgProduzido: i.kgProduzido.toFixed(2), precoVendaKg: i.precoVendaKg.toFixed(4), custoMpKg: i.custoMpKg.toFixed(4) })),
+      });
+      return { success: true, id };
+    }),
+
+  delete: publicProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => { await deleteAnalise(input.id); return { success: true }; }),
+});
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -359,6 +509,8 @@ export const appRouter = router({
   calculo: calculoRouter,
   simulacoes: simulacoesRouter,
   materiasPrimas: materiasPrimasRouter,
+  produtos: produtosRouter,
+  analises: analisesRouter,
 });
 
 export type AppRouter = typeof appRouter;
