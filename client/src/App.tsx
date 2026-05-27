@@ -13,6 +13,7 @@ import Historico from "./pages/Historico";
 import Importar from "./pages/Importar";
 import Produtos from "./pages/Produtos";
 import AnaliseMix from "./pages/AnaliseMix";
+import OtimizadorMix from "./pages/OtimizadorMix";
 import AppLayout from "./components/AppLayout";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
         <Route path="/importar" component={Importar} />
         <Route path="/produtos" component={Produtos} />
         <Route path="/analise-mix" component={AnaliseMix} />
+        <Route path="/otimizador-mix" component={OtimizadorMix} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

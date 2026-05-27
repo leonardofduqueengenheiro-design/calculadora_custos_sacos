@@ -533,6 +533,181 @@ const analisesRouter = router({
   delete: publicProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => { await deleteAnalise(input.id); return { success: true }; }),
+
+  /**
+   * Otimizador de Mix de Produção
+   *
+   * Dado um conjunto de produtos com preços de venda, custos de MP e
+   * restrições de volume (mínimo e máximo por produto), encontra a
+   * distribuição de kg que maximiza a margem de lucro total.
+   *
+   * Estratégia (Programação Linear simplificada):
+   * 1. Calcular a margem unitária de cada produto para um volume total estimado.
+   * 2. Ordenar produtos por margem unitária decrescente.
+   * 3. Alocar o volume disponível começando pelos mais rentáveis, respeitando
+   *    os limites mínimos e máximos de cada produto.
+   * 4. Como o custo fixo/kg depende do volume total (Custeio por Absorção),
+   *    iterar até convergência (o volume total é fixo, então o custo fixo/kg
+   *    não muda entre iterações — a ordenação por margem é estável).
+   */
+  otimizar: publicProcedure
+    .input(z.object({
+      volumeTotalKg: z.number().min(1, 'Volume total deve ser maior que zero'),
+      produtos: z.array(z.object({
+        produtoId: z.number(),
+        produtoNome: z.string(),
+        precoVendaKg: z.number().min(0),
+        custoMpKg: z.number().min(0),
+        kgAtual: z.number().min(0).default(0),      // volume atual (para comparação)
+        kgMinimo: z.number().min(0).default(0),      // restrição mínima
+        kgMaximo: z.number().min(0).optional(),      // restrição máxima (opcional)
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      const { volumeTotalKg, produtos: prods } = input;
+
+      // Carregar parâmetros do banco
+      const [custos, params] = await Promise.all([getCustosFixos(), getParametros()]);
+      const paramMap: Record<string, number> = {};
+      for (const p of params) paramMap[p.chave] = parseFloat(p.valor);
+      const aliquotaSimples = paramMap['aliquota_simples'] ?? 11;
+      const energiaPercentualFixo = paramMap['energia_percentual_fixo'] ?? 20;
+      const combustivelPercentualFixo = paramMap['combustivel_percentual_fixo'] ?? 30;
+      const fretePercentualFixo = paramMap['frete_percentual_fixo'] ?? 40;
+
+      // Calcular custos mistos com o volume total informado
+      const { totalFixos, totalVariavelKg, energiaVariavelKg, combustivelVariavelKg, freteVariavelKg } =
+        calcularCustosMistos(custos, energiaPercentualFixo, combustivelPercentualFixo, fretePercentualFixo, volumeTotalKg);
+      const custoFixoKg = calcularCustoFixoKg(totalFixos, volumeTotalKg);
+
+      // Calcular margem unitária de cada produto (independente do volume individual)
+      const produtosComMargem = prods.map(p => {
+        const custoTotalKg = calcularCustoTotalKg(custoFixoKg, p.custoMpKg, totalVariavelKg);
+        const { margemUnitaria, margemPercentual, simplesKg } = calcularMargem(p.precoVendaKg, custoTotalKg, aliquotaSimples);
+        return { ...p, custoTotalKg, margemUnitaria, margemPercentual, simplesKg };
+      });
+
+      // Validar que a soma dos mínimos não excede o volume total
+      const somaMinimos = produtosComMargem.reduce((s, p) => s + p.kgMinimo, 0);
+      if (somaMinimos > volumeTotalKg) {
+        throw new Error(`Soma dos volumes mínimos (${somaMinimos.toFixed(0)} kg) excede o volume total (${volumeTotalKg.toFixed(0)} kg)`);
+      }
+
+      // Validar que a soma dos máximos (quando todos definidos) comporta o volume total
+      const todosTemMaximo = produtosComMargem.every(p => p.kgMaximo !== undefined && p.kgMaximo > 0);
+      if (todosTemMaximo) {
+        const somaMaximos = produtosComMargem.reduce((s, p) => s + (p.kgMaximo ?? 0), 0);
+        if (somaMaximos < volumeTotalKg - 0.01) {
+          throw new Error(`Soma dos volumes máximos (${somaMaximos.toFixed(0)} kg) é menor que o volume total (${volumeTotalKg.toFixed(0)} kg). Aumente os máximos ou reduza o volume total.`);
+        }
+      }
+
+      // Algoritmo de alocação gulosa (greedy) com Custeio por Absorção
+      // Passo 1: alocar os mínimos garantidos
+      const alocacao: Record<number, number> = {};
+      for (const p of produtosComMargem) alocacao[p.produtoId] = p.kgMinimo;
+      let volumeRestante = volumeTotalKg - somaMinimos;
+
+      // Passo 2: ordenar por margem unitária decrescente
+      const ordenados = [...produtosComMargem].sort((a, b) => b.margemUnitaria - a.margemUnitaria);
+
+      // Passo 3: alocar o volume restante nos produtos mais rentáveis
+      for (const p of ordenados) {
+        if (volumeRestante <= 0) break;
+        const espacoDisponivel = (p.kgMaximo !== undefined && p.kgMaximo > 0)
+          ? Math.max(0, p.kgMaximo - alocacao[p.produtoId])
+          : volumeRestante;
+        const alocar = Math.min(volumeRestante, espacoDisponivel);
+        alocacao[p.produtoId] += alocar;
+        volumeRestante -= alocar;
+      }
+
+      // Passo 4: se ainda sobrar volume (todos com máximo atingido), distribuir nos sem máximo
+      if (volumeRestante > 0.01) {
+        const semMaximo = ordenados.filter(p => !p.kgMaximo || p.kgMaximo <= 0);
+        if (semMaximo.length > 0) {
+          const porcao = volumeRestante / semMaximo.length;
+          for (const p of semMaximo) alocacao[p.produtoId] += porcao;
+          volumeRestante = 0;
+        }
+        // Se ainda sobrar (todos com máximo e validação passou), é erro de arredondamento — ignorar
+      }
+
+      // Calcular resultados do mix otimizado
+      const resultadoOtimizado = produtosComMargem.map(p => {
+        const kgOtimizado = alocacao[p.produtoId] ?? 0;
+        const faturamento = p.precoVendaKg * kgOtimizado;
+        const lucro = p.margemUnitaria * kgOtimizado;
+        const kgDelta = kgOtimizado - p.kgAtual;
+        return {
+          produtoId: p.produtoId,
+          produtoNome: p.produtoNome,
+          precoVendaKg: p.precoVendaKg,
+          custoMpKg: p.custoMpKg,
+          custoTotalKg: p.custoTotalKg,
+          margemUnitaria: p.margemUnitaria,
+          margemPercentual: p.margemPercentual,
+          simplesKg: p.simplesKg,
+          kgAtual: p.kgAtual,
+          kgOtimizado,
+          kgDelta,
+          participacaoPct: volumeTotalKg > 0 ? (kgOtimizado / volumeTotalKg) * 100 : 0,
+          faturamento,
+          lucro,
+        };
+      });
+
+      // Calcular resultados do mix atual (para comparação)
+      const totalKgAtual = prods.reduce((s, p) => s + p.kgAtual, 0);
+      const resultadoAtual = totalKgAtual > 0 ? (() => {
+        const { totalFixos: tf2, totalVariavelKg: tv2 } = calcularCustosMistos(
+          custos, energiaPercentualFixo, combustivelPercentualFixo, fretePercentualFixo, totalKgAtual
+        );
+        const cfKg2 = calcularCustoFixoKg(tf2, totalKgAtual);
+        return produtosComMargem.map(p => {
+          const ctKg2 = calcularCustoTotalKg(cfKg2, p.custoMpKg, tv2);
+          const { margemUnitaria: mu2 } = calcularMargem(p.precoVendaKg, ctKg2, aliquotaSimples);
+          return {
+            produtoId: p.produtoId,
+            kgAtual: p.kgAtual,
+            lucroAtual: mu2 * p.kgAtual,
+            faturamentoAtual: p.precoVendaKg * p.kgAtual,
+          };
+        });
+      })() : null;
+
+      const totalFaturamento = resultadoOtimizado.reduce((s, r) => s + r.faturamento, 0);
+      const totalLucro = resultadoOtimizado.reduce((s, r) => s + r.lucro, 0);
+      const margemConsolidada = totalFaturamento > 0 ? (totalLucro / totalFaturamento) * 100 : 0;
+
+      const totalLucroAtual = resultadoAtual ? resultadoAtual.reduce((s, r) => s + r.lucroAtual, 0) : null;
+      const totalFaturamentoAtual = resultadoAtual ? resultadoAtual.reduce((s, r) => s + r.faturamentoAtual, 0) : null;
+      const margemAtual = totalFaturamentoAtual && totalFaturamentoAtual > 0 && totalLucroAtual !== null
+        ? (totalLucroAtual / totalFaturamentoAtual) * 100 : null;
+
+      return {
+        resultadoOtimizado,
+        totalKg: volumeTotalKg,
+        totalFaturamento,
+        totalLucro,
+        margemConsolidada,
+        custoFixoKg,
+        totalVariavelKg,
+        energiaVariavelKg,
+        combustivelVariavelKg,
+        freteVariavelKg,
+        aliquotaSimples,
+        // Comparação com mix atual
+        comparacao: resultadoAtual ? {
+          totalKgAtual,
+          totalLucroAtual,
+          totalFaturamentoAtual,
+          margemAtual,
+          ganhoLucro: totalLucroAtual !== null ? totalLucro - totalLucroAtual : null,
+          ganhoMargem: margemAtual !== null ? margemConsolidada - margemAtual : null,
+        } : null,
+      };
+    }),
 });
 
 export const appRouter = router({

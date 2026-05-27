@@ -11,6 +11,7 @@ import {
   Upload,
   Package,
   BarChart3,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,12 @@ const navItems = [
     label: "Análise por Mix",
     icon: BarChart3,
     description: "Margem por produto",
+  },
+  {
+    href: "/otimizador-mix",
+    label: "Otimizador de Mix",
+    icon: Sparkles,
+    description: "Mix ideal para maior margem",
   },
   {
     href: "/importar",

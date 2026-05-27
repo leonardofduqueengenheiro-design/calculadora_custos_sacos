@@ -74,3 +74,14 @@
 - [x] UI: Análise por Mix exibe nota explicativa sobre rateio de custos fixos (Custeio por Absorção)
 - [x] UI: Análise por Mix mostra custo fixo/kg recalculado com base no volume total do mix
 - [x] UI: Análise por Mix exibe detalhamento separado de energia, combustível e frete variáveis por kg
+
+## Novas Funcionalidades (v8 — Otimizador de Mix)
+
+- [x] Backend: procedure tRPC `analises.otimizar` com algoritmo de otimização de mix por margem
+- [x] Backend: suporte a restrições de volume mínimo/máximo por produto e volume total
+- [x] Frontend: página dedicada "Otimizador de Mix" com rota /otimizador-mix
+- [x] Frontend: tabela comparativa (mix atual vs mix otimizado) com delta de kg e margem
+- [x] Frontend: gráfico de barras agrupadas (kg atual vs kg otimizado por produto)
+- [x] Frontend: gráfico de pizza/rosca mostrando participação % de cada produto no mix otimizado
+- [x] Frontend: card de ganho de lucro e margem vs mix atual
+- [x] Testes vitest para a função de otimização (6 novos testes — total: 44)

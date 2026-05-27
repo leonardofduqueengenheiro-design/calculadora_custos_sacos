@@ -434,3 +434,135 @@ describe("Custos Mistos — Combustível e Frete", () => {
     expect(totalVariavelKg).toBeCloseTo(0, 4);
   });
 });
+
+// ─── Otimizador de Mix de Produção ───────────────────────────────────────────
+
+/**
+ * Algoritmo de otimização gulosa (greedy):
+ * 1. Calcular margem unitária de cada produto
+ * 2. Alocar mínimos garantidos
+ * 3. Ordenar por margem decrescente
+ * 4. Alocar volume restante nos mais rentáveis (respeitando máximos)
+ */
+function otimizarMix(
+  produtos: {
+    id: number;
+    precoVendaKg: number;
+    custoMpKg: number;
+    kgMinimo?: number;
+    kgMaximo?: number;
+  }[],
+  volumeTotalKg: number,
+  custoFixoKg: number,
+  totalVariavelKg: number,
+  aliquotaSimples: number
+) {
+  // Calcular margem unitária de cada produto
+  const comMargem = produtos.map(p => {
+    const custoTotalKg = custoFixoKg + p.custoMpKg + totalVariavelKg;
+    const simplesKg = p.precoVendaKg * (aliquotaSimples / 100);
+    const margemUnitaria = p.precoVendaKg - simplesKg - custoTotalKg;
+    return { ...p, margemUnitaria, kgMinimo: p.kgMinimo ?? 0 };
+  });
+
+  // Alocar mínimos
+  const alocacao: Record<number, number> = {};
+  for (const p of comMargem) alocacao[p.id] = p.kgMinimo;
+  let restante = volumeTotalKg - comMargem.reduce((s, p) => s + p.kgMinimo, 0);
+
+  // Ordenar por margem decrescente
+  const ordenados = [...comMargem].sort((a, b) => b.margemUnitaria - a.margemUnitaria);
+
+  // Alocar restante nos mais rentáveis
+  for (const p of ordenados) {
+    if (restante <= 0) break;
+    const espaco = p.kgMaximo !== undefined
+      ? Math.max(0, p.kgMaximo - alocacao[p.id])
+      : restante;
+    const alocar = Math.min(restante, espaco);
+    alocacao[p.id] += alocar;
+    restante -= alocar;
+  }
+
+  const totalLucro = comMargem.reduce((s, p) => s + p.margemUnitaria * alocacao[p.id], 0);
+  return { alocacao, totalLucro, comMargem };
+}
+
+describe("Otimizador de Mix de Produção", () => {
+  const custoFixoKg = 9.065;
+  const totalVariavelKg = 0.80;
+  const aliquotaSimples = 11;
+  const volumeTotal = 31498;
+
+  it("aloca todo o volume no produto mais rentável quando sem restrições", () => {
+    const produtos = [
+      { id: 1, precoVendaKg: 28, custoMpKg: 7.00 },  // maior margem
+      { id: 2, precoVendaKg: 22, custoMpKg: 8.00 },  // menor margem
+    ];
+    const { alocacao } = otimizarMix(produtos, volumeTotal, custoFixoKg, totalVariavelKg, aliquotaSimples);
+    expect(alocacao[1]).toBeCloseTo(volumeTotal, 0);
+    expect(alocacao[2]).toBeCloseTo(0, 0);
+  });
+
+  it("respeita volume mínimo do produto menos rentável", () => {
+    const produtos = [
+      { id: 1, precoVendaKg: 28, custoMpKg: 7.00, kgMinimo: 0 },
+      { id: 2, precoVendaKg: 22, custoMpKg: 8.00, kgMinimo: 5000 },
+    ];
+    const { alocacao } = otimizarMix(produtos, volumeTotal, custoFixoKg, totalVariavelKg, aliquotaSimples);
+    expect(alocacao[2]).toBeGreaterThanOrEqual(5000);
+    expect(alocacao[1] + alocacao[2]).toBeCloseTo(volumeTotal, 0);
+  });
+
+  it("respeita volume máximo do produto mais rentável", () => {
+    const produtos = [
+      { id: 1, precoVendaKg: 28, custoMpKg: 7.00, kgMaximo: 10000 },
+      { id: 2, precoVendaKg: 22, custoMpKg: 8.00 },
+    ];
+    const { alocacao } = otimizarMix(produtos, volumeTotal, custoFixoKg, totalVariavelKg, aliquotaSimples);
+    expect(alocacao[1]).toBeLessThanOrEqual(10000 + 0.01);
+    expect(alocacao[1] + alocacao[2]).toBeCloseTo(volumeTotal, 0);
+  });
+
+  it("lucro otimizado é maior ou igual ao lucro de distribuição uniforme", () => {
+    const produtos = [
+      { id: 1, precoVendaKg: 28, custoMpKg: 7.00 },
+      { id: 2, precoVendaKg: 22, custoMpKg: 8.00 },
+      { id: 3, precoVendaKg: 25, custoMpKg: 7.50 },
+    ];
+    const { totalLucro: lucroOtimizado } = otimizarMix(produtos, volumeTotal, custoFixoKg, totalVariavelKg, aliquotaSimples);
+
+    // Calcular lucro com distribuição uniforme (1/3 cada)
+    const kgUniforme = volumeTotal / 3;
+    const lucroUniforme = produtos.reduce((s, p) => {
+      const custoTotalKg = custoFixoKg + p.custoMpKg + totalVariavelKg;
+      const simplesKg = p.precoVendaKg * (aliquotaSimples / 100);
+      const margem = p.precoVendaKg - simplesKg - custoTotalKg;
+      return s + margem * kgUniforme;
+    }, 0);
+
+    expect(lucroOtimizado).toBeGreaterThanOrEqual(lucroUniforme - 0.01);
+  });
+
+  it("produto com margem negativa recebe apenas o mínimo obrigatório", () => {
+    const produtos = [
+      { id: 1, precoVendaKg: 28, custoMpKg: 7.00 },
+      { id: 2, precoVendaKg: 12, custoMpKg: 8.00, kgMinimo: 1000 }, // preço abaixo do custo
+    ];
+    const { alocacao, comMargem } = otimizarMix(produtos, volumeTotal, custoFixoKg, totalVariavelKg, aliquotaSimples);
+    const prod2 = comMargem.find(p => p.id === 2)!;
+    expect(prod2.margemUnitaria).toBeLessThan(0);
+    expect(alocacao[2]).toBeCloseTo(1000, 0); // apenas o mínimo
+  });
+
+  it("soma das alocações é igual ao volume total", () => {
+    const produtos = [
+      { id: 1, precoVendaKg: 26, custoMpKg: 7.00, kgMinimo: 3000, kgMaximo: 15000 },
+      { id: 2, precoVendaKg: 24, custoMpKg: 7.37, kgMinimo: 5000, kgMaximo: 20000 },
+      { id: 3, precoVendaKg: 22, custoMpKg: 8.00, kgMinimo: 2000 },
+    ];
+    const { alocacao } = otimizarMix(produtos, volumeTotal, custoFixoKg, totalVariavelKg, aliquotaSimples);
+    const somaTotal = Object.values(alocacao).reduce((s, v) => s + v, 0);
+    expect(somaTotal).toBeCloseTo(volumeTotal, 0);
+  });
+});
