@@ -1,7 +1,12 @@
 import express from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
-import { getDb } from "./db";
+import {
+  assegurarHistoricoBaseAnterior,
+  definirImportacaoAtiva,
+  getDb,
+  salvarHistoricoImportacao,
+} from "./db";
 import { custosFixos, parametros } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -260,6 +265,16 @@ export function extrairPreviewPlanilha(workbook: XLSX.WorkBook): PreviewImportac
   };
 }
 
+export function obterIntervaloImportacao(mesesDetectados: unknown): { periodoInicio: string | null; periodoFim: string | null } {
+  const meses = Array.isArray(mesesDetectados)
+    ? mesesDetectados.filter((mes): mes is string => typeof mes === "string")
+    : [];
+  return {
+    periodoInicio: meses[0] ?? null,
+    periodoFim: meses[meses.length - 1] ?? null,
+  };
+}
+
 export function registerUploadRoutes(app: express.Application) {
   app.post("/api/upload/planilha", upload.single("file"), async (req, res) => {
     try {
@@ -277,11 +292,33 @@ export function registerUploadRoutes(app: express.Application) {
 
   app.post("/api/upload/confirmar", express.json(), async (req, res) => {
     try {
-      const { mediasPorCategoria, mediaMateriaPrima, mediaFaturamento } = req.body;
+      const {
+        nomeArquivo,
+        mesesDetectados,
+        numMeses,
+        totalLinhas,
+        linhasProcessadas,
+        linhasIgnoradas,
+        totalCustos,
+        totalMateriaPrima,
+        totalFaturamento,
+        mediasPorCategoria,
+        mediaMateriaPrima,
+        mediaFaturamento,
+      } = req.body;
       if (!mediasPorCategoria) return res.status(400).json({ error: "Dados inválidos." });
+
+      const meses = Array.isArray(mesesDetectados)
+        ? mesesDetectados.filter((mes): mes is string => typeof mes === "string")
+        : [];
+      const { periodoInicio, periodoFim } = obterIntervaloImportacao(meses);
 
       const db = await getDb();
       if (!db) return res.status(500).json({ error: "Banco de dados indisponível." });
+
+      // Salva os valores anteriores na primeira vez que o recurso for usado.
+      // Isso evita que a base atual seja perdida ao confirmar a próxima importação.
+      await assegurarHistoricoBaseAnterior();
 
       const labels: Record<string, string> = {
         folha_pagamento: "Folha de Pagamento",
@@ -325,7 +362,25 @@ export function registerUploadRoutes(app: express.Application) {
           .onDuplicateKeyUpdate({ set: { valor: mediaFaturamento.toFixed(2) } });
       }
 
-      return res.json({ success: true, message: "Dados atualizados com sucesso!" });
+      const historicoId = await salvarHistoricoImportacao({
+        nomeArquivo: typeof nomeArquivo === "string" && nomeArquivo.trim() ? nomeArquivo.trim() : "Planilha importada",
+        periodoInicio,
+        periodoFim,
+        mesesDetectados: meses,
+        numMeses: Number.isFinite(numMeses) ? numMeses : meses.length,
+        totalLinhas: Number.isFinite(totalLinhas) ? totalLinhas : 0,
+        linhasProcessadas: Number.isFinite(linhasProcessadas) ? linhasProcessadas : 0,
+        linhasIgnoradas: Number.isFinite(linhasIgnoradas) ? linhasIgnoradas : 0,
+        totalCustos: Number.isFinite(totalCustos) ? totalCustos : 0,
+        totalMateriaPrima: Number.isFinite(totalMateriaPrima) ? totalMateriaPrima : 0,
+        totalFaturamento: Number.isFinite(totalFaturamento) ? totalFaturamento : 0,
+        mediasPorCategoria,
+        mediaMateriaPrima: Number.isFinite(mediaMateriaPrima) ? mediaMateriaPrima : 0,
+        mediaFaturamento: Number.isFinite(mediaFaturamento) ? mediaFaturamento : 0,
+      });
+      if (historicoId > 0) await definirImportacaoAtiva(historicoId);
+
+      return res.json({ success: true, historicoId, message: "Dados atualizados e histórico preservado com sucesso!" });
     } catch (error) {
       console.error("[Upload] Erro ao confirmar importação:", error);
       return res.status(500).json({ error: "Erro ao salvar os dados." });

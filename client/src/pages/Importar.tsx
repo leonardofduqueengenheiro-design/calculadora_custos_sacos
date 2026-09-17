@@ -83,6 +83,15 @@ export default function Importar() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          nomeArquivo: fileName,
+          mesesDetectados: preview.mesesDetectados,
+          numMeses: preview.numMeses,
+          totalLinhas: preview.totalLinhas,
+          linhasProcessadas: preview.linhasProcessadas,
+          linhasIgnoradas: preview.linhasIgnoradas.length,
+          totalCustos: preview.totalCustos,
+          totalMateriaPrima: preview.totalMateriaPrima,
+          totalFaturamento: preview.totalFaturamento,
           mediasPorCategoria: preview.mediasPorCategoria,
           mediaMateriaPrima: preview.mediaMateriaPrima,
           mediaFaturamento: preview.mediaFaturamento,
@@ -94,8 +103,10 @@ export default function Importar() {
       await utils.custos.list.invalidate();
       await utils.calculo.resumo.invalidate();
       await utils.parametros.list.invalidate();
+      await utils.importacoes.list.invalidate();
+      await utils.importacoes.ativa.invalidate();
       setStep("success");
-      toast.success("Dados importados com sucesso! Dashboard atualizado.");
+      toast.success("Dados importados, período registrado e histórico preservado!");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao confirmar importação");
     } finally {
@@ -359,7 +370,7 @@ export default function Importar() {
             Calculadora Atualizada!
           </h2>
           <p className="text-sm mb-6" style={{ color: "var(--muted-foreground)" }}>
-            Os custos foram importados com sucesso. O Dashboard e o Simulador já refletem os novos valores.
+            Os custos foram importados com sucesso. Esta base foi registrada no histórico, e o Dashboard e o Simulador já refletem os novos valores.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
@@ -375,6 +386,13 @@ export default function Importar() {
               style={{ background: "var(--primary)", color: "white" }}
             >
               Ver Dashboard
+            </a>
+            <a
+              href="/historico-dados"
+              className="rounded-lg px-4 py-2 text-center text-sm font-medium transition-all hover:opacity-80"
+              style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
+            >
+              Ver Histórico de Dados
             </a>
           </div>
         </div>

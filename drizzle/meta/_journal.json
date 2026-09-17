@@ -43,6 +43,13 @@
       "when": 1779900726453,
       "tag": "0005_public_pride",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1789668098431,
+      "tag": "0006_optimal_slayback",
+      "breakpoints": true
     }
   ]
 }

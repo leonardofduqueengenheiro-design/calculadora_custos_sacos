@@ -1,0 +1,20 @@
+CREATE TABLE `historico_importacoes` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`nome_arquivo` varchar(255) NOT NULL,
+	`origem` varchar(30) NOT NULL DEFAULT 'importacao',
+	`periodo_inicio` varchar(10),
+	`periodo_fim` varchar(10),
+	`meses_detectados` text NOT NULL,
+	`num_meses` int NOT NULL DEFAULT 0,
+	`total_linhas` int NOT NULL DEFAULT 0,
+	`linhas_processadas` int NOT NULL DEFAULT 0,
+	`linhas_ignoradas` int NOT NULL DEFAULT 0,
+	`total_custos` decimal(15,2) NOT NULL DEFAULT '0',
+	`total_materia_prima` decimal(15,2) NOT NULL DEFAULT '0',
+	`total_faturamento` decimal(15,2) NOT NULL DEFAULT '0',
+	`medias_por_categoria` text NOT NULL,
+	`media_materia_prima` decimal(15,2) NOT NULL DEFAULT '0',
+	`media_faturamento` decimal(15,2) NOT NULL DEFAULT '0',
+	`created_at` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `historico_importacoes_id` PRIMARY KEY(`id`)
+);

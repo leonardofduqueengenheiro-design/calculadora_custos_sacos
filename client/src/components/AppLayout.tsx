@@ -13,8 +13,10 @@ import {
   BarChart3,
   Sparkles,
   Menu,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 import {
   Sheet,
   SheetContent,
@@ -33,6 +35,7 @@ const navItems = [
   { href: "/analise-mix", label: "Análise por Mix", icon: BarChart3, description: "Margem por produto" },
   { href: "/otimizador-mix", label: "Otimizador de Mix", icon: Sparkles, description: "Mix ideal para maior margem" },
   { href: "/importar", label: "Importar Planilha", icon: Upload, description: "Atualizar com Excel" },
+  { href: "/historico-dados", label: "Histórico de Dados", icon: Archive, description: "Bases e períodos usados" },
 ];
 
 function Brand() {
@@ -66,6 +69,11 @@ function NavigationContent({
   location: string;
   onNavigate?: () => void;
 }) {
+  const { data: importacaoAtiva } = trpc.importacoes.ativa.useQuery();
+  const periodoAtivo = importacaoAtiva?.periodoInicio && importacaoAtiva?.periodoFim
+    ? `${importacaoAtiva.periodoInicio} a ${importacaoAtiva.periodoFim}`
+    : "Período não registrado";
+
   return (
     <>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Navegação principal">
@@ -110,7 +118,9 @@ function NavigationContent({
 
       <div className="border-t px-6 py-4" style={{ borderColor: "var(--sidebar-border)" }}>
         <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Dados baseados em médias reais</p>
-        <p className="mt-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>Período: 17 meses</p>
+        <p className="mt-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>
+          Período: {periodoAtivo}{importacaoAtiva?.numMeses ? ` · ${importacaoAtiva.numMeses} meses` : ""}
+        </p>
       </div>
     </>
   );

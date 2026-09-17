@@ -59,6 +59,31 @@ export const parametros = mysqlTable("parametros", {
 export type Parametro = typeof parametros.$inferSelect;
 export type InsertParametro = typeof parametros.$inferInsert;
 
+// Fotografias imutáveis dos dados confirmados em cada importação de planilha.
+// Preservam o período e as médias efetivamente utilizadas nos cálculos.
+export const historicoImportacoes = mysqlTable("historico_importacoes", {
+  id: int("id").autoincrement().primaryKey(),
+  nomeArquivo: varchar("nome_arquivo", { length: 255 }).notNull(),
+  origem: varchar("origem", { length: 30 }).notNull().default("importacao"),
+  periodoInicio: varchar("periodo_inicio", { length: 10 }),
+  periodoFim: varchar("periodo_fim", { length: 10 }),
+  mesesDetectados: text("meses_detectados").notNull(),
+  numMeses: int("num_meses").notNull().default(0),
+  totalLinhas: int("total_linhas").notNull().default(0),
+  linhasProcessadas: int("linhas_processadas").notNull().default(0),
+  linhasIgnoradas: int("linhas_ignoradas").notNull().default(0),
+  totalCustos: decimal("total_custos", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalMateriaPrima: decimal("total_materia_prima", { precision: 15, scale: 2 }).notNull().default("0"),
+  totalFaturamento: decimal("total_faturamento", { precision: 15, scale: 2 }).notNull().default("0"),
+  mediasPorCategoria: text("medias_por_categoria").notNull(),
+  mediaMateriaPrima: decimal("media_materia_prima", { precision: 15, scale: 2 }).notNull().default("0"),
+  mediaFaturamento: decimal("media_faturamento", { precision: 15, scale: 2 }).notNull().default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type HistoricoImportacao = typeof historicoImportacoes.$inferSelect;
+export type InsertHistoricoImportacao = typeof historicoImportacoes.$inferInsert;
+
 // Histórico de simulações
 export const simulacoes = mysqlTable("simulacoes", {
   id: int("id").autoincrement().primaryKey(),

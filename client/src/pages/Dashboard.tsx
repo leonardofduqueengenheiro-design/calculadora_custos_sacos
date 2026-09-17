@@ -135,6 +135,7 @@ function BreakEvenTooltip({ active, payload, label }: any) {
 export default function Dashboard() {
   const { data: resumo, isLoading, refetch } = trpc.calculo.resumo.useQuery();
   const { data: custos } = trpc.custos.list.useQuery();
+  const { data: importacaoAtiva } = trpc.importacoes.ativa.useQuery();
 
   if (isLoading) {
     return (
@@ -224,7 +225,11 @@ export default function Dashboard() {
             Dashboard Financeiro
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>
-            Indicadores baseados em médias de 17 meses de operação
+            {importacaoAtiva?.periodoInicio && importacaoAtiva?.periodoFim
+              ? `Base ativa: ${importacaoAtiva.periodoInicio} a ${importacaoAtiva.periodoFim} · ${importacaoAtiva.numMeses} mês(es)`
+              : importacaoAtiva
+                ? "Base ativa anterior — período não registrado"
+                : "Base ativa sem período de importação registrado"}
           </p>
         </div>
         <button

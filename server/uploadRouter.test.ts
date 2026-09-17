@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { extrairPreviewPlanilha, parseValor } from "./uploadRouter";
+import { extrairPreviewPlanilha, obterIntervaloImportacao, parseValor } from "./uploadRouter";
 
 function criarPlanilhaNovoFormato() {
   const linhas = [
@@ -40,5 +40,13 @@ describe("Importação da nova planilha de controle", () => {
     expect(preview.mediasPorCategoria.folha_pagamento).toBeUndefined();
     expect(preview.mediaMateriaPrima).toBeCloseTo(3.65, 2);
     expect(preview.mediaFaturamento).toBeCloseTo(1000, 2);
+  });
+
+  it("salva o intervalo cronológico detectado no histórico", () => {
+    expect(obterIntervaloImportacao(["01/2025", "03/2025", "04/2026"])).toEqual({
+      periodoInicio: "01/2025",
+      periodoFim: "04/2026",
+    });
+    expect(obterIntervaloImportacao([])).toEqual({ periodoInicio: null, periodoFim: null });
   });
 });

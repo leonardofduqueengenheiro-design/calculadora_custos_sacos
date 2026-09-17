@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, analiseItens, analisesPeriodo, custosFixos, historicoCustoMp, materiasPrimas, parametros, produtoMateriasPrimas, produtos, simulacoes, users } from "../drizzle/schema";
+import { InsertUser, analiseItens, analisesPeriodo, custosFixos, historicoCustoMp, historicoImportacoes, materiasPrimas, parametros, produtoMateriasPrimas, produtos, simulacoes, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -118,6 +118,121 @@ export async function setParametro(chave: string, valor: string, descricao?: str
   await db.insert(parametros)
     .values({ chave, valor, descricao })
     .onDuplicateKeyUpdate({ set: { valor, ...(descricao ? { descricao } : {}) } });
+}
+
+// ─── Histórico de Importações ─────────────────────────────────────────────────
+
+export interface DadosHistoricoImportacao {
+  nomeArquivo: string;
+  origem?: "importacao" | "base_anterior";
+  periodoInicio?: string | null;
+  periodoFim?: string | null;
+  mesesDetectados: string[];
+  numMeses: number;
+  totalLinhas: number;
+  linhasProcessadas: number;
+  linhasIgnoradas: number;
+  totalCustos: number;
+  totalMateriaPrima: number;
+  totalFaturamento: number;
+  mediasPorCategoria: Record<string, number>;
+  mediaMateriaPrima: number;
+  mediaFaturamento: number;
+}
+
+function agruparCustosAtivos(custos: Array<{ categoria: string; valorMensal: string }>) {
+  return custos.reduce<Record<string, number>>((acumulado, custo) => {
+    acumulado[custo.categoria] = (acumulado[custo.categoria] ?? 0) + parseFloat(custo.valorMensal);
+    return acumulado;
+  }, {});
+}
+
+export async function getHistoricoImportacoes(limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  await assegurarHistoricoBaseAnterior();
+  return db.select().from(historicoImportacoes).orderBy(desc(historicoImportacoes.createdAt)).limit(limit);
+}
+
+export async function getImportacaoAtiva() {
+  const db = await getDb();
+  if (!db) return null;
+  const parametroAtivo = await db.select().from(parametros)
+    .where(eq(parametros.chave, "importacao_ativa_id"))
+    .limit(1);
+  const idAtivo = Number.parseInt(parametroAtivo[0]?.valor ?? "", 10);
+  if (!Number.isInteger(idAtivo) || idAtivo <= 0) return null;
+  const importacao = await db.select().from(historicoImportacoes)
+    .where(eq(historicoImportacoes.id, idAtivo))
+    .limit(1);
+  return importacao[0] ?? null;
+}
+
+export async function salvarHistoricoImportacao(dados: DadosHistoricoImportacao) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const resultado = await db.insert(historicoImportacoes).values({
+    nomeArquivo: dados.nomeArquivo,
+    origem: dados.origem ?? "importacao",
+    periodoInicio: dados.periodoInicio ?? null,
+    periodoFim: dados.periodoFim ?? null,
+    mesesDetectados: JSON.stringify(dados.mesesDetectados),
+    numMeses: dados.numMeses,
+    totalLinhas: dados.totalLinhas,
+    linhasProcessadas: dados.linhasProcessadas,
+    linhasIgnoradas: dados.linhasIgnoradas,
+    totalCustos: dados.totalCustos.toFixed(2),
+    totalMateriaPrima: dados.totalMateriaPrima.toFixed(2),
+    totalFaturamento: dados.totalFaturamento.toFixed(2),
+    mediasPorCategoria: JSON.stringify(dados.mediasPorCategoria),
+    mediaMateriaPrima: dados.mediaMateriaPrima.toFixed(2),
+    mediaFaturamento: dados.mediaFaturamento.toFixed(2),
+  });
+  return Number((resultado as any)[0]?.insertId ?? 0);
+}
+
+export async function definirImportacaoAtiva(id: number) {
+  await setParametro("importacao_ativa_id", String(id), "ID do histórico de dados ativo nos cálculos");
+}
+
+/**
+ * Antes da primeira atualização após esta funcionalidade, registra os valores
+ * correntes para que nenhuma base previamente usada seja perdida.
+ */
+export async function assegurarHistoricoBaseAnterior() {
+  const ativa = await getImportacaoAtiva();
+  if (ativa) return ativa.id;
+
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [custosAtivos, parametrosAtuais] = await Promise.all([
+    db.select().from(custosFixos).where(eq(custosFixos.ativo, 1)),
+    db.select().from(parametros),
+  ]);
+  const mediasPorCategoria = agruparCustosAtivos(custosAtivos);
+  const paramMap = Object.fromEntries(parametrosAtuais.map(parametro => [parametro.chave, parseFloat(parametro.valor)]));
+  const existeBase = Object.keys(mediasPorCategoria).length > 0 || paramMap.total_mp_mensal > 0 || paramMap.faturamento_mensal_importado > 0;
+  if (!existeBase) return null;
+
+  const id = await salvarHistoricoImportacao({
+    nomeArquivo: "Base anterior à implantação do histórico (01/2025–04/2026)",
+    origem: "base_anterior",
+    periodoInicio: "01/2025",
+    periodoFim: "04/2026",
+    mesesDetectados: [],
+    numMeses: 17,
+    totalLinhas: 0,
+    linhasProcessadas: 0,
+    linhasIgnoradas: 0,
+    totalCustos: Object.values(mediasPorCategoria).reduce((soma, valor) => soma + valor, 0),
+    totalMateriaPrima: paramMap.total_mp_mensal ?? 0,
+    totalFaturamento: paramMap.faturamento_mensal_importado ?? 0,
+    mediasPorCategoria,
+    mediaMateriaPrima: paramMap.total_mp_mensal ?? 0,
+    mediaFaturamento: paramMap.faturamento_mensal_importado ?? 0,
+  });
+  if (id > 0) await definirImportacaoAtiva(id);
+  return id || null;
 }
 
 

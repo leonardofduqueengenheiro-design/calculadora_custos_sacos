@@ -29,6 +29,8 @@ import {
   getAnaliseItens,
   saveAnalise,
   deleteAnalise,
+  getHistoricoImportacoes,
+  getImportacaoAtiva,
 } from "./db";
 
 // ─── Lógica de cálculo financeiro ────────────────────────────────────────────
@@ -450,6 +452,11 @@ const simulacoesRouter = router({
     }),
 });
 
+const importacoesRouter = router({
+  list: publicProcedure.query(async () => getHistoricoImportacoes()),
+  ativa: publicProcedure.query(async () => getImportacaoAtiva()),
+});
+
 const produtosRouter = router({
   list: publicProcedure.query(async () => {
     const prods = await getProdutos();
@@ -819,6 +826,7 @@ export const appRouter = router({
   parametros: parametrosRouter,
   calculo: calculoRouter,
   simulacoes: simulacoesRouter,
+  importacoes: importacoesRouter,
   materiasPrimas: materiasPrimasRouter,
   produtos: produtosRouter,
   analises: analisesRouter,
