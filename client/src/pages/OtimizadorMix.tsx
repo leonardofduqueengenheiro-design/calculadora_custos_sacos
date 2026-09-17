@@ -307,7 +307,7 @@ export default function OtimizadorMix() {
           <Separator />
 
           {/* Cabeçalho da tabela */}
-          <div className="grid grid-cols-12 gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">
+          <div className="hidden grid-cols-12 gap-3 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
             <div className="col-span-4">Produto</div>
             <div className="col-span-2">Custo MP/kg</div>
             <div className="col-span-2">Preço Venda/kg *</div>
@@ -319,9 +319,9 @@ export default function OtimizadorMix() {
 
           {produtosInput.map((item, idx) => (
             <div key={item.produtoId} className="space-y-2">
-              <div className="grid grid-cols-12 gap-3 items-center">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-center">
                 {/* Nome */}
-                <div className="col-span-4 flex items-center gap-2">
+                <div className="col-span-1 flex items-center gap-2 md:col-span-4">
                   <div
                     className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                     style={{ background: CORES_HEX[idx % CORES_HEX.length] }}
@@ -330,14 +330,16 @@ export default function OtimizadorMix() {
                 </div>
 
                 {/* Custo MP */}
-                <div className="col-span-2">
+                <div className="col-span-1 md:col-span-2">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Custo de MP/kg</span>
                   <span className="text-sm font-mono text-primary">
                     {item.custoMpKg > 0 ? fmt(item.custoMpKg) : "—"}
                   </span>
                 </div>
 
                 {/* Preço de venda */}
-                <div className="col-span-2">
+                <div className="col-span-1 md:col-span-2">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Preço de venda/kg</span>
                   <Input
                     type="number"
                     min="0"
@@ -350,7 +352,8 @@ export default function OtimizadorMix() {
                 </div>
 
                 {/* Kg atual */}
-                <div className="col-span-2">
+                <div className="col-span-1 md:col-span-2">
+                  <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Kg atual</span>
                   <Input
                     type="number"
                     min="0"
@@ -363,7 +366,7 @@ export default function OtimizadorMix() {
                 </div>
 
                 {/* Toggle restrições */}
-                <div className="col-span-2">
+                <div className="col-span-1 md:col-span-2">
                   <button
                     onClick={() => handleChange(idx, "showRestricoes", !item.showRestricoes)}
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -376,7 +379,7 @@ export default function OtimizadorMix() {
 
               {/* Restrições expandidas */}
               {item.showRestricoes && (
-                <div className="ml-6 p-3 rounded-md bg-muted/20 border border-border/30 grid grid-cols-2 gap-3">
+                <div className="ml-0 grid grid-cols-1 gap-3 rounded-md border border-border/30 bg-muted/20 p-3 sm:ml-6 sm:grid-cols-2">
                   <div>
                     <Label className="text-xs text-muted-foreground">Volume Mínimo (kg)</Label>
                     <Input
@@ -410,7 +413,7 @@ export default function OtimizadorMix() {
 
           <Separator />
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
               {produtosValidos.length} produto(s) com preço informado
             </p>
@@ -430,7 +433,7 @@ export default function OtimizadorMix() {
       {resultado && (
         <div className="space-y-5">
           {/* KPIs de comparação */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             <Card className="border-border/50">
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Volume Total</p>
@@ -515,7 +518,7 @@ export default function OtimizadorMix() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[930px] text-sm">
                   <thead>
                     <tr className="border-b border-border/50">
                       <th className="text-left py-2 text-xs text-muted-foreground font-medium uppercase">Produto</th>
@@ -617,7 +620,7 @@ export default function OtimizadorMix() {
           {/* Gráficos */}
           <Card className="border-border/50">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   {chartView === "barras"
                     ? <><BarChart2 className="h-4 w-4 text-primary" /> Comparativo de Volume por Produto</>
@@ -653,7 +656,7 @@ export default function OtimizadorMix() {
                     Comparação entre o volume atual informado e o volume otimizado sugerido para cada produto.
                     Produtos com maior margem unitária recebem maior alocação de volume.
                   </p>
-                  <ResponsiveContainer width="100%" height={320}>
+                  <ResponsiveContainer width="100%" height={260}>
                     <BarChart
                       data={dadosBarras}
                       margin={{ top: 10, right: 20, left: 10, bottom: 10 }}

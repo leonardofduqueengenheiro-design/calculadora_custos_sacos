@@ -67,7 +67,7 @@ export default function Simulador() {
   const pr = simPreco.data;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>Simulador Financeiro</h1>
         <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>
@@ -80,7 +80,7 @@ export default function Simulador() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Simulador 1: Preço → Margem */}
-        <div className="rounded-xl p-6 card-gradient space-y-5" style={{ border: "1px solid var(--border)" }}>
+        <div className="rounded-xl p-4 sm:p-6 card-gradient space-y-5" style={{ border: "1px solid var(--border)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.72 0.18 195 / 0.15)", border: "1px solid oklch(0.72 0.18 195 / 0.25)" }}>
               <Calculator className="w-5 h-5" style={{ color: "var(--primary)" }} />
@@ -133,7 +133,7 @@ export default function Simulador() {
           {mr && (
             <div className="space-y-3 animate-fade-in-up">
               <div className="divider-gradient" />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <ResultCard
                   label="Margem Percentual"
                   value={formatPercent(mr.margemPercentual)}
@@ -148,7 +148,7 @@ export default function Simulador() {
                   positive={mr.margemUnitaria > 0}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <ResultCard label="Margem Mensal" value={formatBRL(mr.margemMensal, 0)} sub="Produção mensal completa" positive={mr.margemMensal > 0} />
                 <ResultCard label="Lucro Potencial Estoque" value={formatBRL(mr.lucroPotencialEstoque, 0)} sub="100 toneladas × margem" positive={mr.lucroPotencialEstoque > 0} />
               </div>
@@ -172,7 +172,7 @@ export default function Simulador() {
         </div>
 
         {/* Simulador 2: Margem → Preço */}
-        <div className="rounded-xl p-6 card-gradient space-y-5" style={{ border: "1px solid var(--border)" }}>
+        <div className="rounded-xl p-4 sm:p-6 card-gradient space-y-5" style={{ border: "1px solid var(--border)" }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.70 0.18 155 / 0.15)", border: "1px solid oklch(0.70 0.18 155 / 0.25)" }}>
               <Target className="w-5 h-5" style={{ color: "oklch(0.70 0.18 155)" }} />
@@ -246,7 +246,7 @@ export default function Simulador() {
           {pr && (
             <div className="space-y-3 animate-fade-in-up">
               <div className="divider-gradient" />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <ResultCard
                   label="Preço Mínimo de Venda"
                   value={formatBRL(pr.precoMinimo, 4)}
@@ -261,7 +261,7 @@ export default function Simulador() {
                   positive={pr.margemPercentual > 0}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <ResultCard label="Margem Mensal" value={formatBRL(pr.margemMensal, 0)} sub="Produção mensal completa" positive={pr.margemMensal > 0} />
                 <ResultCard label="Lucro Potencial Estoque" value={formatBRL(pr.lucroPotencialEstoque, 0)} sub="100 toneladas × margem" positive={pr.lucroPotencialEstoque > 0} />
               </div>
@@ -287,7 +287,7 @@ export default function Simulador() {
 
       {/* Tabela de cenários */}
       <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-        <div className="px-6 py-4 flex items-center justify-between" style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)" }}>
+        <div className="flex items-start justify-between gap-3 px-4 py-4 sm:items-center sm:px-6" style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)" }}>
           <div>
             <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Tabela de Cenários Comparativos</h2>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
@@ -298,7 +298,8 @@ export default function Simulador() {
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px]">
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)" }}>
               {["Variação", "Preço de Venda", "Margem por kg", "Margem %", "Margem Mensal", "Status"].map(h => (
@@ -343,7 +344,8 @@ export default function Simulador() {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );

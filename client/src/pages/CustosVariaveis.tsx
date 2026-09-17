@@ -49,9 +49,8 @@ function MpRow({ mp, onSaved, onVerHistorico }: { mp: MP; onSaved: () => void; o
 
   return (
     <div
-      className="grid gap-3 items-center p-3 rounded-xl transition-all"
+      className="grid grid-cols-2 items-center gap-3 rounded-xl p-3 transition-all sm:grid-cols-[2rem_minmax(0,1fr)_10rem_8.125rem_2.75rem_2.75rem]"
       style={{
-        gridTemplateColumns: "2rem 1fr 160px 130px 44px 44px",
         background: dirty ? "oklch(0.25 0.06 140 / 0.4)" : "var(--muted)",
         border: `1px solid ${dirty ? "oklch(0.65 0.18 140 / 0.5)" : "var(--border)"}`,
       }}
@@ -74,7 +73,7 @@ function MpRow({ mp, onSaved, onVerHistorico }: { mp: MP; onSaved: () => void; o
       />
 
       {/* Custo por kg */}
-      <div className="relative">
+      <div className="relative col-span-2 sm:col-auto">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--muted-foreground)" }}>R$</span>
         <input
           value={custo}
@@ -93,7 +92,7 @@ function MpRow({ mp, onSaved, onVerHistorico }: { mp: MP; onSaved: () => void; o
       </div>
 
       {/* Percentual */}
-      <div className="relative">
+      <div className="relative col-span-2 sm:col-auto">
         <input
           value={pct}
           onChange={e => { setPct(e.target.value); mark(); }}
@@ -114,7 +113,7 @@ function MpRow({ mp, onSaved, onVerHistorico }: { mp: MP; onSaved: () => void; o
       {/* Histórico */}
       <button
         onClick={() => onVerHistorico(mp)}
-        className="h-10 w-10 rounded-lg flex items-center justify-center transition-all"
+        className="h-10 w-full rounded-lg flex items-center justify-center transition-all sm:w-10"
         title="Ver histórico de variação de custo"
         style={{
           background: "var(--secondary)",
@@ -129,7 +128,7 @@ function MpRow({ mp, onSaved, onVerHistorico }: { mp: MP; onSaved: () => void; o
       <button
         onClick={save}
         disabled={!dirty || update.isPending}
-        className="h-10 w-10 rounded-lg flex items-center justify-center transition-all"
+        className="h-10 w-full rounded-lg flex items-center justify-center transition-all sm:w-10"
         style={{
           background: dirty ? "oklch(0.65 0.18 140)" : "var(--secondary)",
           color: "white",
@@ -398,8 +397,8 @@ export default function CustosVariaveis() {
       </div>
 
       {/* Matérias-Primas */}
-      <div className="rounded-xl p-6 card-gradient" style={{ border: "1px solid var(--border)" }}>
-        <div className="flex items-center justify-between mb-5">
+      <div className="rounded-xl p-4 sm:p-6 card-gradient" style={{ border: "1px solid var(--border)" }}>
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ background: "oklch(0.72 0.18 60 / 0.15)", border: "1px solid oklch(0.72 0.18 60 / 0.25)" }}>
@@ -428,7 +427,7 @@ export default function CustosVariaveis() {
         </div>
 
         {/* Cabeçalho das colunas */}
-        <div className="grid gap-3 px-3 pb-2 text-xs font-medium" style={{ gridTemplateColumns: "2rem 1fr 160px 130px 44px 44px", color: "var(--muted-foreground)" }}>
+        <div className="hidden gap-3 px-3 pb-2 text-xs font-medium sm:grid sm:grid-cols-[2rem_minmax(0,1fr)_10rem_8.125rem_2.75rem_2.75rem]" style={{ color: "var(--muted-foreground)" }}>
           <div />
           <span>Nome da Matéria-Prima</span>
           <span className="text-right pr-2">Custo (R$/kg)</span>
@@ -456,7 +455,7 @@ export default function CustosVariaveis() {
 
         {/* Custo médio ponderado */}
         <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
-          <div className="flex items-center justify-between rounded-xl p-4" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
+          <div className="flex flex-col gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
             <div>
               <p className="text-xs uppercase tracking-wider font-medium" style={{ color: "var(--muted-foreground)" }}>Custo Médio Ponderado</p>
               <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
@@ -497,12 +496,12 @@ export default function CustosVariaveis() {
       <SimplesCard />
 
       {/* Impacto resumido */}
-      <div className="rounded-xl p-6 card-gradient" style={{ border: "1px solid var(--border)" }}>
+      <div className="rounded-xl p-4 sm:p-6 card-gradient" style={{ border: "1px solid var(--border)" }}>
         <div className="flex items-center gap-2 mb-5">
           <Info className="w-4 h-4" style={{ color: "var(--primary)" }} />
           <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Impacto no Custo por kg</h2>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { label: "Custo MP Ponderado", valor: formatBRL(custoMedio, 4), desc: "Custo variável direto" },
             { label: `SIMPLES sobre R$${precoVenda}`, valor: formatBRL(precoVenda * aliquotaSimples / 100, 4), desc: `${aliquotaSimples}% do preço de venda` },

@@ -41,7 +41,7 @@ function KpiCard({
 }) {
   return (
     <div
-      className={cn("rounded-xl p-6 card-gradient animate-fade-in-up", glowClass)}
+      className={cn("rounded-xl p-4 sm:p-6 card-gradient animate-fade-in-up", glowClass)}
       style={{
         animationDelay: `${delay}ms`,
         border: "1px solid var(--border)",
@@ -216,9 +216,9 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>
             Dashboard Financeiro
@@ -238,7 +238,7 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs principais */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Custo Total por kg"
           value={formatBRL(resumo.custoTotalKg, 4)}
@@ -281,7 +281,7 @@ export default function Dashboard() {
 
       {/* Break-Even Chart — linha inteira */}
       <div
-        className="rounded-xl p-6 card-gradient animate-fade-in-up"
+        className="rounded-xl p-4 sm:p-6 card-gradient animate-fade-in-up"
         style={{ border: "1px solid var(--border)", animationDelay: "300ms" }}
       >
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
@@ -333,8 +333,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={breakEvenData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+        <div className="h-[260px] sm:h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={breakEvenData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="oklch(0.35 0.01 260)"
@@ -418,8 +419,9 @@ export default function Dashboard() {
               dot={false}
               activeDot={{ r: 5, fill: "oklch(0.65 0.22 25)" }}
             />
-          </LineChart>
-        </ResponsiveContainer>
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
 
         {/* Legenda explicativa */}
         <div className="mt-4 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3" style={{ borderTop: "1px solid var(--border)" }}>
@@ -443,7 +445,7 @@ export default function Dashboard() {
 
         {/* Decomposição de custos */}
         <div
-          className="lg:col-span-2 rounded-xl p-6 card-gradient animate-fade-in-up"
+          className="lg:col-span-2 rounded-xl p-4 sm:p-6 card-gradient animate-fade-in-up"
           style={{ border: "1px solid var(--border)", animationDelay: "320ms" }}
         >
           <div className="flex items-center justify-between mb-6">

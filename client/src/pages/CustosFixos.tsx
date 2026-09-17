@@ -133,7 +133,7 @@ export default function CustosFixos() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>Custos Fixos Mensais</h1>
           <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>
@@ -150,7 +150,7 @@ export default function CustosFixos() {
       </div>
 
       {/* Resumo por categoria */}
-      <div className="grid grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {CATEGORIAS_LIST.map(([key, label]) => {
           const subtotal = grupos[key]?.reduce((s, c) => s + parseFloat(c.valorMensal), 0) ?? 0;
           const pct = total > 0 ? (subtotal / total) * 100 : 0;
@@ -169,7 +169,8 @@ export default function CustosFixos() {
 
       {/* Tabela */}
       <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px]">
           <thead>
             <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)" }}>
               <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Categoria</th>
@@ -239,7 +240,8 @@ export default function CustosFixos() {
               <td />
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );

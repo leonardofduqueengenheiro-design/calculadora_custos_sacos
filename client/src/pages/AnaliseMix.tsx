@@ -175,7 +175,7 @@ export default function AnaliseMix() {
   }
 
   return (
-    <div className="space-y-6 p-6 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl space-y-6 p-0 sm:p-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Análise por Mix de Produtos</h1>
@@ -205,7 +205,7 @@ export default function AnaliseMix() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Cabeçalho da tabela */}
-          <div className="grid grid-cols-12 gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">
+          <div className="hidden grid-cols-12 gap-3 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
             <div className="col-span-4">Produto</div>
             <div className="col-span-3">Kg Produzido/Vendido</div>
             <div className="col-span-3">Preço de Venda (R$/kg)</div>
@@ -219,8 +219,9 @@ export default function AnaliseMix() {
             const isExpanded = expandedProduto === item.produtoId;
             return (
               <div key={item.produtoId} className="space-y-2">
-                <div className="grid grid-cols-12 gap-3 items-center">
-                  <div className="col-span-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-center">
+                  <div className="col-span-1 md:col-span-4">
+                    <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Produto</span>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-primary/60" />
                       <span className="text-sm font-medium text-foreground">{item.produtoNome}</span>
@@ -234,7 +235,8 @@ export default function AnaliseMix() {
                       )}
                     </div>
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-1 md:col-span-3">
+                    <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Kg produzido/vendido</span>
                     <Input
                       type="number"
                       min="0"
@@ -245,7 +247,8 @@ export default function AnaliseMix() {
                       className="h-8 text-sm bg-background/50"
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-1 md:col-span-3">
+                    <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Preço de venda (R$/kg)</span>
                     <Input
                       type="number"
                       min="0"
@@ -256,7 +259,8 @@ export default function AnaliseMix() {
                       className="h-8 text-sm bg-background/50"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-1 md:col-span-2">
+                    <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Custo de MP/kg</span>
                     <span className="text-sm font-mono text-primary">
                       {item.custoMpKg > 0 ? fmt(item.custoMpKg) : "—"}
                     </span>
@@ -290,12 +294,12 @@ export default function AnaliseMix() {
           <Separator />
 
           {/* Totais de entrada */}
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
             <span className="text-muted-foreground">
               {itensValidos.length} produto(s) com dados preenchidos ·{" "}
               {fmtKg(itensValidos.reduce((s, i) => s + parseFloat(i.kgProduzido || "0"), 0))} total
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="outline" size="sm" onClick={handleLimpar}>
                 <RotateCcw className="h-3 w-3 mr-1" />
                 Limpar
@@ -317,7 +321,7 @@ export default function AnaliseMix() {
       {resultado && (
         <div className="space-y-4">
           {/* KPIs consolidados */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             <Card className="border-border/50">
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Produzido</p>
@@ -414,7 +418,7 @@ export default function AnaliseMix() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[820px] text-sm">
                   <thead>
                     <tr className="border-b border-border/50">
                       <th className="text-left py-2 text-xs text-muted-foreground font-medium uppercase">Produto</th>
@@ -473,7 +477,7 @@ export default function AnaliseMix() {
           </Card>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => window.print()}>
               Imprimir Relatório
             </Button>

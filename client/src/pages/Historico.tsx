@@ -15,17 +15,17 @@ export default function Historico() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>Histórico de Simulações</h1>
           <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>
             Simulações salvas para comparação de cenários
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-80"
+            className="flex flex-1 items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-80 sm:flex-none"
             style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
           >
             <Printer className="w-4 h-4" />
@@ -83,7 +83,8 @@ export default function Historico() {
         </div>
       ) : (
         <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-          <table className="w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px]">
             <thead>
               <tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)" }}>
                 {["Tipo", "Data", "Preço / Margem Desejada", "Custo Total/kg", "Margem %", "Margem/kg", "Margem Mensal", ""].map(h => (
@@ -143,7 +144,8 @@ export default function Historico() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
 

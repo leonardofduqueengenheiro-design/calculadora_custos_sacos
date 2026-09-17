@@ -87,6 +87,11 @@ body {
   font-family: 'DM Sans', 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+html, body, #root {
+  min-height: 100%;
 }
 
 .container {
@@ -161,3 +166,13 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* Hover em linhas de tabela */
 tr:hover td { background: oklch(0.16 0.010 260 / 0.5); }
+
+@media (max-width: 639px) {
+  .metric-value {
+    font-size: 1.75rem;
+  }
+
+  input, select, textarea, button {
+    font-size: 16px;
+  }
+}

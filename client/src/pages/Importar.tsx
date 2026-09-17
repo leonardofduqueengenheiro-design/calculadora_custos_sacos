@@ -113,7 +113,7 @@ export default function Importar() {
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Cabeçalho */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--foreground)" }}>
             Importar Planilha
@@ -161,7 +161,7 @@ export default function Importar() {
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileRef.current?.click()}
-            className="rounded-xl p-12 text-center cursor-pointer transition-all"
+            className="cursor-pointer rounded-xl p-6 text-center transition-all sm:p-12"
             style={{
               border: `2px dashed ${dragging ? "var(--primary)" : "var(--border)"}`,
               background: dragging ? "var(--primary)/5" : "var(--card)",
@@ -234,7 +234,7 @@ export default function Importar() {
       {step === "preview" && preview && (
         <div className="space-y-4">
           {/* Arquivo */}
-          <div className="flex items-center justify-between rounded-xl p-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+          <div className="flex items-start justify-between gap-3 rounded-xl p-4 sm:items-center" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
             <div className="flex items-center gap-3">
               <FileSpreadsheet className="w-8 h-8" style={{ color: "oklch(0.70 0.18 155)" }} />
               <div>
@@ -264,7 +264,7 @@ export default function Importar() {
           )}
 
           {/* Resumo financeiro */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
             {[
               { l: "Total Custos", v: formatBRL(preview.totalCustos, 0), c: "oklch(0.65 0.22 25)" },
               { l: "Total Matéria-Prima", v: formatBRL(preview.totalMateriaPrima, 0), c: "oklch(0.65 0.18 50)" },
@@ -328,7 +328,7 @@ export default function Importar() {
           )}
 
           {/* Botões */}
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <button
               onClick={resetar}
               className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-80"
@@ -339,7 +339,7 @@ export default function Importar() {
             <button
               onClick={handleConfirmar}
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-50"
               style={{ background: "var(--primary)", color: "white" }}
             >
               {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
@@ -361,17 +361,17 @@ export default function Importar() {
           <p className="text-sm mb-6" style={{ color: "var(--muted-foreground)" }}>
             Os custos foram importados com sucesso. O Dashboard e o Simulador já refletem os novos valores.
           </p>
-          <div className="flex gap-3 justify-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
               onClick={resetar}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-80"
+              className="rounded-lg px-4 py-2 text-center text-sm font-medium transition-all hover:opacity-80"
               style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
             >
               Nova Importação
             </button>
             <a
               href="/"
-              className="px-6 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90"
+              className="rounded-lg px-6 py-2 text-center text-sm font-semibold transition-all hover:opacity-90"
               style={{ background: "var(--primary)", color: "white" }}
             >
               Ver Dashboard

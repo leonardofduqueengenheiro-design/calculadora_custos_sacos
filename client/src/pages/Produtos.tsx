@@ -192,9 +192,9 @@ function ProdutoCard({
 
   return (
     <Card className="border-border/50">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <CardHeader className="pb-3 p-4 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <Package className="h-4 w-4 text-primary" />
             </div>
@@ -233,7 +233,7 @@ function ProdutoCard({
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Preço de venda padrão */}
             <div className="flex items-center gap-1.5">
               <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
@@ -271,7 +271,7 @@ function ProdutoCard({
       </CardHeader>
 
       {expanded && (
-        <CardContent className="pt-0 space-y-4">
+        <CardContent className="space-y-4 px-4 pb-4 pt-0 sm:px-6 sm:pb-6">
           <Separator />
 
           {/* Alerta de custos desatualizados */}
@@ -323,7 +323,7 @@ function ProdutoCard({
             </div>
 
             {/* Cabeçalho */}
-            <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-1">
+            <div className="mb-2 hidden grid-cols-12 gap-2 px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
               <div className="col-span-1">#</div>
               <div className="col-span-3">Vincular ao Catálogo</div>
               <div className="col-span-3">Nome da MP</div>
@@ -341,7 +341,7 @@ function ProdutoCard({
                 return (
                   <div
                     key={mp.ordem}
-                    className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg transition-colors"
+                    className="grid grid-cols-1 gap-2 rounded-lg p-3 transition-colors md:grid-cols-12 md:items-center md:p-2"
                     style={{
                       background: desatualizada
                         ? "oklch(0.75 0.18 80 / 0.06)"
@@ -355,7 +355,7 @@ function ProdutoCard({
                         : "1px solid transparent",
                     }}
                   >
-                    <div className="col-span-1">
+                    <div className="col-span-1 md:col-span-1">
                       <div className="flex items-center gap-1">
                         <span className="text-xs text-muted-foreground font-mono">{mp.ordem}</span>
                         {desatualizada && (
@@ -364,7 +364,8 @@ function ProdutoCard({
                       </div>
                     </div>
 
-                    <div className="col-span-3">
+                    <div className="col-span-1 md:col-span-3">
+                      <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Vincular ao catálogo</span>
                       <div className="flex items-center gap-1">
                         <select
                           value={mp.materiaPrimaId ?? ""}
@@ -387,7 +388,8 @@ function ProdutoCard({
                       </div>
                     </div>
 
-                    <div className="col-span-3">
+                    <div className="col-span-1 md:col-span-3">
+                      <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Nome da MP</span>
                       <Input
                         placeholder="Ex: PEAD virgem"
                         value={mp.nome}
@@ -398,7 +400,8 @@ function ProdutoCard({
                       />
                     </div>
 
-                    <div className="col-span-2">
+                    <div className="col-span-1 md:col-span-2">
+                      <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Custo (R$/kg)</span>
                       <div className="relative">
                         <Input
                           type="number"
@@ -419,7 +422,8 @@ function ProdutoCard({
                       </div>
                     </div>
 
-                    <div className="col-span-1">
+                    <div className="col-span-1 md:col-span-1">
+                      <span className="mb-1 block text-xs font-medium text-muted-foreground md:hidden">Percentual de uso</span>
                       <Input
                         type="number"
                         min="0"
@@ -432,7 +436,7 @@ function ProdutoCard({
                       />
                     </div>
 
-                    <div className="col-span-2">
+                    <div className="col-span-1 md:col-span-2">
                       <Button
                         size="sm"
                         variant="outline"
@@ -524,15 +528,15 @@ export default function Produtos() {
   }
 
   return (
-    <div className="space-y-6 p-6 max-w-4xl mx-auto">
-      <div className="flex items-start justify-between">
+    <div className="mx-auto max-w-4xl space-y-6 p-0 sm:p-6">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Configuração de Produtos</h1>
           <p className="text-muted-foreground text-sm mt-1">
             Defina o nome, preço de venda padrão e composição de matérias-primas de cada produto.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {totalDesatualizados > 0 && (
             <Badge variant="destructive" className="gap-1">
               <AlertTriangle className="h-3 w-3" />
