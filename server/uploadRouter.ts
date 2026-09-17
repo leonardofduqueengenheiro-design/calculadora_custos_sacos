@@ -60,7 +60,12 @@ function mapearCategoria(tipo: string): CategoriaValida | null {
   const norm = normalizar(tipo);
   if (TIPO_PARA_CATEGORIA[norm]) return TIPO_PARA_CATEGORIA[norm] as CategoriaValida;
 
-  for (const [key, value] of Object.entries(TIPO_PARA_CATEGORIA)) {
+  // Primeiro avalia nomes mais específicos: evita que “impostos sobre folha de
+  // pagamento” seja capturado prematuramente pela categoria “folha de pagamento”.
+  const aliasesOrdenados = Object.entries(TIPO_PARA_CATEGORIA)
+    .sort(([aliasA], [aliasB]) => aliasB.length - aliasA.length);
+
+  for (const [key, value] of aliasesOrdenados) {
     if (norm.includes(key) || key.includes(norm)) return value as CategoriaValida;
   }
 

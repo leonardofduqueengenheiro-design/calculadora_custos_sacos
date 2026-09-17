@@ -13,6 +13,7 @@ function criarPlanilhaNovoFormato() {
     ["11/09/2026", "1.234,56", "pago", "Transportadora A", "001", "", "", "Transporte/Frete", "LUKPLAST", "", "sim", "e-mail", ""],
     ["12/09/2026", "2.000,00", "pago", "Cliente B", "002", "", "", "Faturamento", "LUKPLAST", "", "", "", ""],
     ["15/10/2026", "500,00", "agendado", "Consultoria C", "003", "", "", "Serviços", "LUKPLAST", "", "sim", "boleto", ""],
+    ["16/10/2026", "400,00", "pago", "INSS", "003-A", "", "", "impostos sobre folha de pagamento", "LUKPLAST", "", "sim", "boleto", ""],
     ["18/10/2026", "7.3000", "pago", "Resina D", "004", "", "", "Matéria-Prima", "LUKPLAST", "", "", "", ""],
   ];
   const workbook = XLSX.utils.book_new();
@@ -32,9 +33,11 @@ describe("Importação da nova planilha de controle", () => {
 
     expect(preview.numMeses).toBe(2);
     expect(preview.mesesDetectados).toEqual(["09/2026", "10/2026"]);
-    expect(preview.linhasProcessadas).toBe(3);
+    expect(preview.linhasProcessadas).toBe(4);
     expect(preview.mediasPorCategoria.transporte_frete).toBeCloseTo(617.28, 2);
     expect(preview.mediasPorCategoria.servicos).toBeCloseTo(250, 2);
+    expect(preview.mediasPorCategoria.impostos_folha).toBeCloseTo(200, 2);
+    expect(preview.mediasPorCategoria.folha_pagamento).toBeUndefined();
     expect(preview.mediaMateriaPrima).toBeCloseTo(3.65, 2);
     expect(preview.mediaFaturamento).toBeCloseTo(1000, 2);
   });
