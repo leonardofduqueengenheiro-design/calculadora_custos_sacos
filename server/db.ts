@@ -177,6 +177,35 @@ const CATEGORIAS_IMPORTACAO = [
   "transporte_frete", "manutencao", "servicos", "comissoes", "diversos",
 ] as const;
 
+// Fotografia conferida na planilha histórica original da Lukplast. É usada
+// somente se o histórico precisar ser inicializado em uma base ainda sem registros.
+const BASE_HISTORICA_INICIAL = {
+  nomeArquivo: "MODELO_CONTROLE_FINANCEIRO_LUKPLAST_V2 — Histórico original",
+  periodoInicio: "01/2025",
+  periodoFim: "12/2026",
+  mesesDetectados: ["01/2025", "06/2025", "07/2025", "08/2025", "09/2025", "10/2025", "11/2025", "12/2025", "01/2026", "02/2026", "03/2026", "04/2026", "05/2026", "06/2026", "07/2026", "08/2026", "09/2026", "12/2026"],
+  numMeses: 18,
+  totalLinhas: 2296,
+  linhasProcessadas: 2252,
+  linhasIgnoradas: 44,
+  totalCustos: 4870688.56,
+  totalMateriaPrima: 2957746.35,
+  totalFaturamento: 0,
+  mediaMateriaPrima: 164319.24,
+  mediaFaturamento: 0,
+  mediasPorCategoria: {
+    folha_pagamento: 138025.71611111093,
+    transporte_frete: 21019.491111111143,
+    manutencao: 12182.640555555556,
+    servicos: 10157.584999999988,
+    combustivel: 6675.9783333333335,
+    energia: 17419.169444444433,
+    impostos_folha: 17812.866111111114,
+    diversos: 39635.70888888888,
+    comissoes: 7664.6533333333355,
+  },
+};
+
 function agruparCustosAtivos(custos: Array<{ categoria: string; valorMensal: string }>) {
   return custos.reduce<Record<string, number>>((acumulado, custo) => {
     acumulado[custo.categoria] = (acumulado[custo.categoria] ?? 0) + parseFloat(custo.valorMensal);
@@ -303,31 +332,22 @@ export async function assegurarHistoricoBaseAnterior() {
 
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [custosAtivos, parametrosAtuais] = await Promise.all([
-    db.select().from(custosFixos).where(eq(custosFixos.ativo, 1)),
-    db.select().from(parametros),
-  ]);
-  const mediasPorCategoria = agruparCustosAtivos(custosAtivos);
-  const paramMap = Object.fromEntries(parametrosAtuais.map(parametro => [parametro.chave, parseFloat(parametro.valor)]));
-  const existeBase = Object.keys(mediasPorCategoria).length > 0 || paramMap.total_mp_mensal > 0 || paramMap.faturamento_mensal_importado > 0;
-  if (!existeBase) return null;
-
   const id = await salvarHistoricoImportacao({
-    nomeArquivo: "Base anterior à implantação do histórico (01/2025–04/2026)",
+    nomeArquivo: BASE_HISTORICA_INICIAL.nomeArquivo,
     origem: "base_anterior",
-    periodoInicio: "01/2025",
-    periodoFim: "04/2026",
-    mesesDetectados: [],
-    numMeses: 17,
-    totalLinhas: 0,
-    linhasProcessadas: 0,
-    linhasIgnoradas: 0,
-    totalCustos: Object.values(mediasPorCategoria).reduce((soma, valor) => soma + valor, 0),
-    totalMateriaPrima: paramMap.total_mp_mensal ?? 0,
-    totalFaturamento: paramMap.faturamento_mensal_importado ?? 0,
-    mediasPorCategoria,
-    mediaMateriaPrima: paramMap.total_mp_mensal ?? 0,
-    mediaFaturamento: paramMap.faturamento_mensal_importado ?? 0,
+    periodoInicio: BASE_HISTORICA_INICIAL.periodoInicio,
+    periodoFim: BASE_HISTORICA_INICIAL.periodoFim,
+    mesesDetectados: BASE_HISTORICA_INICIAL.mesesDetectados,
+    numMeses: BASE_HISTORICA_INICIAL.numMeses,
+    totalLinhas: BASE_HISTORICA_INICIAL.totalLinhas,
+    linhasProcessadas: BASE_HISTORICA_INICIAL.linhasProcessadas,
+    linhasIgnoradas: BASE_HISTORICA_INICIAL.linhasIgnoradas,
+    totalCustos: BASE_HISTORICA_INICIAL.totalCustos,
+    totalMateriaPrima: BASE_HISTORICA_INICIAL.totalMateriaPrima,
+    totalFaturamento: BASE_HISTORICA_INICIAL.totalFaturamento,
+    mediasPorCategoria: BASE_HISTORICA_INICIAL.mediasPorCategoria,
+    mediaMateriaPrima: BASE_HISTORICA_INICIAL.mediaMateriaPrima,
+    mediaFaturamento: BASE_HISTORICA_INICIAL.mediaFaturamento,
   });
   if (id > 0) await definirImportacaoAtiva(id);
   return id || null;
