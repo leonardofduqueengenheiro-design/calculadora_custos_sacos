@@ -139,7 +139,9 @@ function encontrarLinhasDeDados(sheet: XLSX.WorkSheet): LinhaPlanilha[] {
     const colunas = linha.map(celula => normalizar(String(celula)));
     const temValor = colunas.some(coluna => coluna === "valor" || coluna.startsWith("valor ("));
     const temVencimento = colunas.some(coluna => coluna === "vencimento" || coluna.startsWith("vencimento "));
-    const temTipo = colunas.some(coluna => coluna === "tipo" || coluna === "categoria");
+    const temTipo = colunas.some(coluna =>
+      coluna === "tipo" || coluna.startsWith("tipo ") || coluna === "categoria" || coluna.startsWith("categoria ")
+    );
     return temValor && (temVencimento || temTipo);
   });
 
@@ -162,7 +164,7 @@ function localizarColunas(primeiraLinha: LinhaPlanilha): Record<string, string> 
     if (norm.includes("venc") || norm === "data") colunas.vencimento = chave;
     else if (norm.includes("valor")) colunas.valor = chave;
     else if (norm.includes("fornec") || norm.includes("descri")) colunas.fornecedor = chave;
-    else if (norm === "tipo" || norm.includes("categoria")) colunas.tipo = chave;
+    else if (norm === "tipo" || norm.startsWith("tipo ") || norm.includes("categoria")) colunas.tipo = chave;
     else if (norm.includes("empres")) colunas.empresa = chave;
     else if (norm.includes("status")) colunas.status = chave;
   }

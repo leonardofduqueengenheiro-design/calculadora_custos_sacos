@@ -7,8 +7,8 @@ function criarPlanilhaNovoFormato() {
     ["CONTROLE FINANCEIRO — LUKPLAST"],
     ["Preencha Vencimento, Valor, Fornecedor e Tipo para a importação."],
     [
-      "Vencimento", "VALOR", "STATUS", "Fornecedor", "nº doc", "nf-e / ct-e",
-      "OBS", "Tipo", "Empresa", "Dist. lucro", "Recorrente", "Onde", "OBS interna",
+      "Vencimento *", "Valor (R$) *", "STATUS", "Fornecedor / Descrição *", "nº doc", "nf-e / ct-e",
+      "OBS", "Tipo *", "Empresa", "Dist. lucro", "Recorrente", "Onde", "OBS interna",
     ],
     ["11/09/2026", "1.234,56", "pago", "Transportadora A", "001", "", "", "Transporte/Frete", "LUKPLAST", "", "sim", "e-mail", ""],
     ["12/09/2026", "2.000,00", "pago", "Cliente B", "002", "", "", "Faturamento", "LUKPLAST", "", "", "", ""],
