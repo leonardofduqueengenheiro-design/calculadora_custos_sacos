@@ -5,6 +5,7 @@ import {
   assegurarHistoricoBaseAnterior,
   definirImportacaoAtiva,
   getDb,
+  getRegrasClassificacaoImportacao,
   salvarHistoricoImportacao,
 } from "./db";
 import { custosFixos, parametros } from "../drizzle/schema";
@@ -50,6 +51,7 @@ export interface PreviewImportacao {
     fornecedor: string;
     valor: number;
   }>;
+  linhasClassificadasPorRegras: number;
   mediasPorCategoria: Record<string, number>;
   mediaMateriaPrima: number;
   mediaFaturamento: number;
@@ -188,7 +190,10 @@ function localizarColunas(primeiraLinha: LinhaPlanilha): Record<string, string> 
   return colunas;
 }
 
-export function extrairPreviewPlanilha(workbook: XLSX.WorkBook): PreviewImportacao {
+export function extrairPreviewPlanilha(
+  workbook: XLSX.WorkBook,
+  regras: Array<{ tipoNormalizado: string; destino: string }> = [],
+): PreviewImportacao {
   const sheetName =
     workbook.SheetNames.find(nome => normalizar(nome).includes("controle")) ||
     workbook.SheetNames[0];
@@ -205,10 +210,12 @@ export function extrairPreviewPlanilha(workbook: XLSX.WorkBook): PreviewImportac
   }
 
   const totaisPorCategoria: Record<string, number> = {};
+  const regrasPorTipo = new Map(regras.map(regra => [regra.tipoNormalizado, regra.destino]));
   let totalFaturamento = 0;
   let totalMateriaPrima = 0;
   const itensIgnorados: PreviewImportacao["itensIgnorados"] = [];
   let linhasProcessadas = 0;
+  let linhasClassificadasPorRegras = 0;
   const mesesDetectados = new Set<string>();
 
   for (const linha of linhas) {
@@ -242,12 +249,27 @@ export function extrairPreviewPlanilha(workbook: XLSX.WorkBook): PreviewImportac
       totaisPorCategoria[categoria] = (totaisPorCategoria[categoria] || 0) + valor;
       linhasProcessadas += 1;
     } else {
-      itensIgnorados.push({
-        id: `ignorado-${itensIgnorados.length + 1}`,
-        tipo: tipoRaw,
-        fornecedor: fornecedor || "sem fornecedor",
-        valor,
-      });
+      const destinoRegra = regrasPorTipo.get(normalizar(tipoRaw));
+      if (destinoRegra === "materia_prima") {
+        totalMateriaPrima += valor;
+        linhasProcessadas += 1;
+        linhasClassificadasPorRegras += 1;
+      } else if (destinoRegra === "faturamento") {
+        totalFaturamento += valor;
+        linhasProcessadas += 1;
+        linhasClassificadasPorRegras += 1;
+      } else if (CATEGORIAS_VALIDAS.includes(destinoRegra as CategoriaValida)) {
+        totaisPorCategoria[destinoRegra!] = (totaisPorCategoria[destinoRegra!] || 0) + valor;
+        linhasProcessadas += 1;
+        linhasClassificadasPorRegras += 1;
+      } else {
+        itensIgnorados.push({
+          id: `ignorado-${itensIgnorados.length + 1}`,
+          tipo: tipoRaw,
+          fornecedor: fornecedor || "sem fornecedor",
+          valor,
+        });
+      }
     }
   }
 
@@ -268,6 +290,7 @@ export function extrairPreviewPlanilha(workbook: XLSX.WorkBook): PreviewImportac
     linhasProcessadas,
     linhasIgnoradas: itensIgnorados.map(item => `${item.tipo} (${item.fornecedor}) — R$ ${item.valor.toFixed(2)}`),
     itensIgnorados,
+    linhasClassificadasPorRegras,
     mediasPorCategoria,
     mediaMateriaPrima: totalMateriaPrima / numMeses,
     mediaFaturamento: totalFaturamento / numMeses,
@@ -352,8 +375,11 @@ export function registerUploadRoutes(app: express.Application) {
     try {
       if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado." });
 
-      const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
-      const preview = extrairPreviewPlanilha(workbook);
+      const [workbook, regras] = [
+        XLSX.read(req.file.buffer, { type: "buffer", cellDates: true }),
+        await getRegrasClassificacaoImportacao(),
+      ] as const;
+      const preview = extrairPreviewPlanilha(workbook, regras);
       return res.json({ success: true, preview });
     } catch (error) {
       console.error("[Upload] Erro ao processar planilha:", error);

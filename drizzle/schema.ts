@@ -84,6 +84,20 @@ export const historicoImportacoes = mysqlTable("historico_importacoes", {
 export type HistoricoImportacao = typeof historicoImportacoes.$inferSelect;
 export type InsertHistoricoImportacao = typeof historicoImportacoes.$inferInsert;
 
+// Regras reutilizáveis para classificar tipos antes não reconhecidos na importação.
+export const regrasClassificacaoImportacao = mysqlTable("regras_classificacao_importacao", {
+  id: int("id").autoincrement().primaryKey(),
+  tipoNormalizado: varchar("tipo_normalizado", { length: 255 }).notNull().unique(),
+  tipoExibicao: varchar("tipo_exibicao", { length: 255 }).notNull(),
+  destino: varchar("destino", { length: 50 }).notNull(),
+  ativo: int("ativo").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type RegraClassificacaoImportacao = typeof regrasClassificacaoImportacao.$inferSelect;
+export type InsertRegraClassificacaoImportacao = typeof regrasClassificacaoImportacao.$inferInsert;
+
 // Histórico de simulações
 export const simulacoes = mysqlTable("simulacoes", {
   id: int("id").autoincrement().primaryKey(),

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Download,
-  RefreshCw, ChevronRight, X, Tags, CircleAlert,
+  RefreshCw, ChevronRight, X, Tags, CircleAlert, BookmarkPlus, Trash2,
 } from "lucide-react";
 import { formatBRL } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
@@ -52,6 +52,7 @@ interface PreviewData {
   linhasProcessadas: number;
   linhasIgnoradas: string[];
   itensIgnorados: ItemIgnorado[];
+  linhasClassificadasPorRegras: number;
   mediasPorCategoria: Record<string, number>;
   mediaMateriaPrima: number;
   mediaFaturamento: number;
@@ -130,9 +131,19 @@ export default function Importar() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [fileName, setFileName] = useState("");
   const [classificacoes, setClassificacoes] = useState<Record<string, DestinoReclassificacao>>({});
+  const [salvarComoRegra, setSalvarComoRegra] = useState<Record<string, boolean>>({});
   const fileRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
   const { data: importacoes } = trpc.importacoes.list.useQuery();
+  const { data: regras } = trpc.importacoes.regras.useQuery();
+  const salvarRegra = trpc.importacoes.salvarRegra.useMutation();
+  const desativarRegra = trpc.importacoes.desativarRegra.useMutation({
+    onSuccess: () => {
+      utils.importacoes.regras.invalidate();
+      toast.success("Regra removida.");
+    },
+    onError: error => toast.error(error.message || "Não foi possível remover a regra."),
+  });
 
   const previewRevisada = useMemo(
     () => preview ? aplicarReclassificacoes(preview, classificacoes) : null,
@@ -154,6 +165,7 @@ export default function Importar() {
     }
     setFileName(file.name);
     setClassificacoes({});
+    setSalvarComoRegra({});
     setLoading(true);
     try {
       const formData = new FormData();
@@ -186,6 +198,17 @@ export default function Importar() {
     if (!previewRevisada) return;
     setLoading(true);
     try {
+      const regrasSelecionadas = preview?.itensIgnorados.filter(item =>
+        salvarComoRegra[item.id] && (classificacoes[item.id] ?? "manter_ignorado") !== "manter_ignorado"
+      ) ?? [];
+      const regrasPorTipo = new Map<string, { tipoExibicao: string; destino: Exclude<DestinoReclassificacao, "manter_ignorado"> }>();
+      for (const item of regrasSelecionadas) {
+        const destino = classificacoes[item.id];
+        if (destino && destino !== "manter_ignorado") {
+          regrasPorTipo.set(item.tipo.trim().toLocaleLowerCase("pt-BR"), { tipoExibicao: item.tipo, destino });
+        }
+      }
+      await Promise.all(Array.from(regrasPorTipo.values()).map(regra => salvarRegra.mutateAsync(regra)));
       const resp = await fetch("/api/upload/confirmar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -212,6 +235,7 @@ export default function Importar() {
         utils.parametros.list.invalidate(),
         utils.importacoes.list.invalidate(),
         utils.importacoes.ativa.invalidate(),
+        utils.importacoes.regras.invalidate(),
       ]);
       setStep("success");
       toast.success("Dados importados, período registrado e histórico preservado!");
@@ -226,6 +250,7 @@ export default function Importar() {
     setStep("upload");
     setPreview(null);
     setClassificacoes({});
+    setSalvarComoRegra({});
     setFileName("");
     if (fileRef.current) fileRef.current.value = "";
   };
@@ -289,6 +314,12 @@ export default function Importar() {
               ].map(item => <div key={item.n} className="flex gap-3"><div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ background: "var(--primary)", color: "white" }}>{item.n}</div><div><p className="text-xs font-semibold" style={{ color: "var(--foreground)" }}>{item.t}</p><p className="mt-0.5 text-xs" style={{ color: "var(--muted-foreground)" }}>{item.d}</p></div></div>)}
             </div>
           </div>
+          {regras && regras.length > 0 && (
+            <div className="rounded-xl p-4" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+              <div className="mb-3 flex items-center gap-2"><BookmarkPlus className="h-4 w-4" style={{ color: "var(--primary)" }} /><h3 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Regras de classificação salvas</h3></div>
+              <div className="flex flex-wrap gap-2">{regras.map(regra => <span key={regra.id} className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs" style={{ background: "var(--muted)", color: "var(--foreground)", border: "1px solid var(--border)" }}><span><strong>{regra.tipoExibicao}</strong> → {CATEGORIA_LABELS[regra.destino] ?? regra.destino}</span><button onClick={() => desativarRegra.mutate({ id: regra.id })} disabled={desativarRegra.isPending} className="rounded p-0.5 hover:opacity-70" title="Remover regra" aria-label={`Remover regra ${regra.tipoExibicao}`}><Trash2 className="h-3 w-3" /></button></span>)}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -298,6 +329,13 @@ export default function Importar() {
             <div className="flex min-w-0 items-center gap-3"><FileSpreadsheet className="h-8 w-8 shrink-0" style={{ color: "oklch(0.70 0.18 155)" }} /><div className="min-w-0"><p className="truncate text-sm font-semibold" style={{ color: "var(--foreground)" }}>{fileName}</p><p className="text-xs" style={{ color: "var(--muted-foreground)" }}>{previewRevisada.totalLinhas} linhas lidas · {previewRevisada.linhasProcessadas} processadas · {previewRevisada.numMeses} mês(es) detectado(s)</p></div></div>
             <button onClick={resetar} className="rounded-lg p-1.5 hover:opacity-70" style={{ color: "var(--muted-foreground)" }} aria-label="Remover arquivo"><X className="h-4 w-4" /></button>
           </div>
+
+          {preview && preview.linhasClassificadasPorRegras > 0 && (
+            <div className="flex items-start gap-2 rounded-xl p-4" style={{ background: "oklch(0.70 0.18 155 / 0.09)", border: "1px solid oklch(0.70 0.18 155 / 0.28)" }}>
+              <BookmarkPlus className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "oklch(0.70 0.18 155)" }} />
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}><strong style={{ color: "var(--foreground)" }}>{preview.linhasClassificadasPorRegras} lançamento(s)</strong> foram classificados automaticamente por regras salvas anteriormente.</p>
+            </div>
+          )}
 
           {intervalo?.inicio && intervalo?.fim && (
             <div className="rounded-xl p-4" style={{ background: "var(--muted)", border: "1px solid var(--border)" }}>
@@ -337,14 +375,17 @@ export default function Importar() {
                 <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{itensReclassificados} reclassificado(s) · {previewRevisada.itensIgnorados.length} continuará(ão) ignorado(s)</span>
               </div>
               <div className="max-h-96 overflow-auto">
-                <table className="w-full min-w-[680px] text-left">
-                  <thead style={{ background: "var(--muted)" }}><tr>{["Tipo original", "Fornecedor", "Valor", "Aplicar como"].map(cabecalho => <th key={cabecalho} className="px-4 py-2.5 text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>{cabecalho}</th>)}</tr></thead>
+                <table className="w-full min-w-[820px] text-left">
+                  <thead style={{ background: "var(--muted)" }}><tr>{["Tipo original", "Fornecedor", "Valor", "Aplicar como", "Usar nas próximas"].map(cabecalho => <th key={cabecalho} className="px-4 py-2.5 text-xs font-semibold" style={{ color: "var(--muted-foreground)" }}>{cabecalho}</th>)}</tr></thead>
                   <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
-                    {preview.itensIgnorados.map(item => <tr key={item.id} style={{ background: "var(--card)" }}><td className="max-w-64 truncate px-4 py-2.5 text-sm" style={{ color: "var(--foreground)" }}>{item.tipo}</td><td className="max-w-56 truncate px-4 py-2.5 text-xs" style={{ color: "var(--muted-foreground)" }}>{item.fornecedor}</td><td className="px-4 py-2.5 text-sm font-medium tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(item.valor, 2)}</td><td className="px-4 py-2.5"><select value={classificacoes[item.id] ?? "manter_ignorado"} onChange={event => setClassificacoes(atual => ({ ...atual, [item.id]: event.target.value as DestinoReclassificacao }))} className="w-52 rounded-md px-2 py-1.5 text-xs outline-none" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>{DESTINOS_RECLASSIFICACAO.map(destino => <option key={destino.value} value={destino.value}>{destino.label}</option>)}</select></td></tr>)}
+                    {preview.itensIgnorados.map(item => {
+                      const destino = classificacoes[item.id] ?? "manter_ignorado";
+                      return <tr key={item.id} style={{ background: "var(--card)" }}><td className="max-w-64 truncate px-4 py-2.5 text-sm" style={{ color: "var(--foreground)" }}>{item.tipo}</td><td className="max-w-56 truncate px-4 py-2.5 text-xs" style={{ color: "var(--muted-foreground)" }}>{item.fornecedor}</td><td className="px-4 py-2.5 text-sm font-medium tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(item.valor, 2)}</td><td className="px-4 py-2.5"><select value={destino} onChange={event => setClassificacoes(atual => ({ ...atual, [item.id]: event.target.value as DestinoReclassificacao }))} className="w-52 rounded-md px-2 py-1.5 text-xs outline-none" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>{DESTINOS_RECLASSIFICACAO.map(opcao => <option key={opcao.value} value={opcao.value}>{opcao.label}</option>)}</select></td><td className="px-4 py-2.5"><label className="flex items-center gap-2 text-xs" style={{ color: destino === "manter_ignorado" ? "var(--muted-foreground)" : "var(--foreground)" }}><input type="checkbox" checked={Boolean(salvarComoRegra[item.id])} disabled={destino === "manter_ignorado"} onChange={event => setSalvarComoRegra(atual => ({ ...atual, [item.id]: event.target.checked }))} /><span>Salvar regra</span></label></td></tr>;
+                    })}
                   </tbody>
                 </table>
               </div>
-              <p className="px-4 py-3 text-xs" style={{ color: "var(--muted-foreground)" }}>A classificação escolhida é aplicada somente nesta importação. Lançamentos de SIMPLES devem permanecer ignorados para evitar duplicidade, pois o imposto já é calculado à parte.</p>
+              <p className="px-4 py-3 text-xs" style={{ color: "var(--muted-foreground)" }}>Marque “Salvar regra” para que esse mesmo Tipo seja classificado automaticamente nos próximos arquivos. Lançamentos de SIMPLES devem permanecer ignorados para evitar duplicidade, pois o imposto já é calculado à parte.</p>
             </div>
           )}
 

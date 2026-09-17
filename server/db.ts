@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, analiseItens, analisesPeriodo, custosFixos, historicoCustoMp, historicoImportacoes, materiasPrimas, parametros, produtoMateriasPrimas, produtos, simulacoes, users } from "../drizzle/schema";
+import { InsertUser, analiseItens, analisesPeriodo, custosFixos, historicoCustoMp, historicoImportacoes, materiasPrimas, parametros, produtoMateriasPrimas, produtos, regrasClassificacaoImportacao, simulacoes, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -118,6 +118,38 @@ export async function setParametro(chave: string, valor: string, descricao?: str
   await db.insert(parametros)
     .values({ chave, valor, descricao })
     .onDuplicateKeyUpdate({ set: { valor, ...(descricao ? { descricao } : {}) } });
+}
+
+// ─── Regras de Classificação de Importação ────────────────────────────────────
+
+export async function getRegrasClassificacaoImportacao() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(regrasClassificacaoImportacao)
+    .where(eq(regrasClassificacaoImportacao.ativo, 1));
+}
+
+export async function salvarRegraClassificacaoImportacao(dados: {
+  tipoNormalizado: string;
+  tipoExibicao: string;
+  destino: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.insert(regrasClassificacaoImportacao).values({
+    ...dados,
+    ativo: 1,
+  }).onDuplicateKeyUpdate({
+    set: { tipoExibicao: dados.tipoExibicao, destino: dados.destino, ativo: 1 },
+  });
+}
+
+export async function desativarRegraClassificacaoImportacao(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(regrasClassificacaoImportacao)
+    .set({ ativo: 0 })
+    .where(eq(regrasClassificacaoImportacao.id, id));
 }
 
 // ─── Histórico de Importações ─────────────────────────────────────────────────

@@ -81,6 +81,22 @@ describe("Importação da nova planilha de controle", () => {
     expect(preview.totalCustos).toBe(0);
   });
 
+  it("aplica regras salvas a tipos antes não reconhecidos", () => {
+    const linhas = [
+      ["Vencimento", "Valor", "Fornecedor", "Tipo"],
+      ["10/10/2026", "120,00", "Fornecedor especial", "Taxa Portuária"],
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(linhas), "CONTROLE");
+    const preview = extrairPreviewPlanilha(workbook, [
+      { tipoNormalizado: "taxa portuaria", destino: "servicos" },
+    ]);
+
+    expect(preview.itensIgnorados).toHaveLength(0);
+    expect(preview.linhasClassificadasPorRegras).toBe(1);
+    expect(preview.mediasPorCategoria.servicos).toBeCloseTo(120, 2);
+  });
+
   it("detecta períodos que se sobrepõem", () => {
     expect(periodosSeSobrepoem("01/2025", "04/2026", "03/2026", "08/2026")).toBe(true);
     expect(periodosSeSobrepoem("01/2025", "04/2026", "05/2026", "08/2026")).toBe(false);

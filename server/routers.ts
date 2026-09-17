@@ -31,7 +31,10 @@ import {
   deleteAnalise,
   getHistoricoImportacoes,
   getImportacaoAtiva,
+  getRegrasClassificacaoImportacao,
   restaurarHistoricoImportacao,
+  salvarRegraClassificacaoImportacao,
+  desativarRegraClassificacaoImportacao,
 } from "./db";
 
 // ─── Lógica de cálculo financeiro ────────────────────────────────────────────
@@ -456,6 +459,27 @@ const simulacoesRouter = router({
 const importacoesRouter = router({
   list: publicProcedure.query(async () => getHistoricoImportacoes()),
   ativa: publicProcedure.query(async () => getImportacaoAtiva()),
+  regras: publicProcedure.query(async () => getRegrasClassificacaoImportacao()),
+  salvarRegra: publicProcedure
+    .input(z.object({
+      tipoExibicao: z.string().trim().min(1).max(255),
+      destino: z.enum(["folha_pagamento", "impostos_folha", "energia", "combustivel", "transporte_frete", "manutencao", "servicos", "comissoes", "diversos", "materia_prima", "faturamento"]),
+    }))
+    .mutation(async ({ input }) => {
+      const { normalizar } = await import("./uploadRouter");
+      await salvarRegraClassificacaoImportacao({
+        tipoNormalizado: normalizar(input.tipoExibicao),
+        tipoExibicao: input.tipoExibicao,
+        destino: input.destino,
+      });
+      return { success: true };
+    }),
+  desativarRegra: publicProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await desativarRegraClassificacaoImportacao(input.id);
+      return { success: true };
+    }),
   restaurar: publicProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input }) => {
