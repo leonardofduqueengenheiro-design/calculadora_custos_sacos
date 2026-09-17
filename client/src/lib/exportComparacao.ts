@@ -23,13 +23,13 @@ export async function exportarComparacaoExcel(dados: DadosComparacaoExportacao) 
   const XLSX = await import("xlsx");
   const linhas: Array<Array<string | number>> = [
     ["COMPARAÇÃO DE IMPORTAÇÕES — LUKPLAST"],
-    ["Base de referência", dados.referencia.nome],
-    ["Período de referência", dados.referencia.periodo],
-    ["Comparada", dados.comparada.nome],
-    ["Período comparado", dados.comparada.periodo],
+    ["Base do período inicial", dados.referencia.nome],
+    ["Período inicial", dados.referencia.periodo],
+    ["Base do período seguinte", dados.comparada.nome],
+    ["Período seguinte", dados.comparada.periodo],
     [],
     ["MÉDIAS MENSAIS POR CATEGORIA"],
-    ["Categoria", "Referência (R$/mês)", "Comparada (R$/mês)", "Variação (R$/mês)", "Variação (%)"],
+    ["Categoria", "Período inicial (R$/mês)", "Período seguinte (R$/mês)", "Variação (R$/mês)", "Variação (%)"],
     ...dados.linhas.map(linha => [
       linha.categoria,
       linha.referencia,
@@ -38,8 +38,8 @@ export async function exportarComparacaoExcel(dados: DadosComparacaoExportacao) 
       linha.referencia !== 0 ? (linha.comparada - linha.referencia) / linha.referencia : null as unknown as number,
     ]),
     [],
-    ["TOTAIS DO PERÍODO"],
-    ["Indicador", "Referência (R$)", "Comparada (R$)", "Variação (R$)", "Variação (%)"],
+    ["INDICADORES DE MÉDIA MENSAL"],
+    ["Indicador", "Período inicial (R$)", "Período seguinte (R$)", "Variação (R$)", "Variação (%)"],
     ...dados.resumo.map(item => [
       item.indicador,
       item.referencia,
@@ -88,9 +88,9 @@ export async function exportarComparacaoPdf(dados: DadosComparacaoExportacao) {
   y += 8;
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(9);
-  pdf.text(`Referência: ${dados.referencia.periodo} — ${dados.referencia.nome}`, margem, y);
+  pdf.text(`Período inicial: ${dados.referencia.periodo} — ${dados.referencia.nome}`, margem, y);
   y += 5;
-  pdf.text(`Comparada: ${dados.comparada.periodo} — ${dados.comparada.nome}`, margem, y);
+  pdf.text(`Período seguinte: ${dados.comparada.periodo} — ${dados.comparada.nome}`, margem, y);
   y += 10;
 
   const desenharCabecalho = (tituloSecao: string) => {
@@ -103,8 +103,8 @@ export async function exportarComparacaoPdf(dados: DadosComparacaoExportacao) {
     y += 5;
     pdf.setTextColor(30, 41, 59);
     pdf.text("Categoria", margem + 3, y);
-    pdf.text("Referência", 155, y, { align: "right" });
-    pdf.text("Comparada", 205, y, { align: "right" });
+    pdf.text("Período inicial", 155, y, { align: "right" });
+    pdf.text("Período seguinte", 205, y, { align: "right" });
     pdf.text("Variação", 252, y, { align: "right" });
     y += 4;
     pdf.setDrawColor(203, 213, 225);
@@ -139,7 +139,7 @@ export async function exportarComparacaoPdf(dados: DadosComparacaoExportacao) {
 
   y += 4;
   if (y > 175) novaPagina();
-  desenharCabecalho("TOTAIS DO PERÍODO");
+  desenharCabecalho("INDICADORES DE MÉDIA MENSAL");
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
   for (const item of dados.resumo) {
@@ -155,6 +155,6 @@ export async function exportarComparacaoPdf(dados: DadosComparacaoExportacao) {
 
   pdf.setFontSize(7);
   pdf.setTextColor(100, 116, 139);
-  pdf.text("Valores em reais. Variação = período comparado menos período de referência.", margem, 201);
+  pdf.text("Valores em reais. Variação = período seguinte menos período inicial.", margem, 201);
   pdf.save(`comparacao_${nomeSeguro(dados.referencia.periodo)}_vs_${nomeSeguro(dados.comparada.periodo)}.pdf`);
 }

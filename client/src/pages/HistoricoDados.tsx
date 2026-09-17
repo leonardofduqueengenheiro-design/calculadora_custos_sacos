@@ -75,10 +75,20 @@ function periodo(importacao: Pick<Importacao, "periodoInicio" | "periodoFim" | "
   return `${importacao.periodoInicio} a ${importacao.periodoFim} · ${importacao.numMeses} meses`;
 }
 
-function Delta({ value }: { value: number }) {
+function indicePeriodo(importacao: Importacao) {
+  const match = importacao.periodoInicio?.match(/^(\d{2})\/(\d{4})$/);
+  if (match) return Number(match[2]) * 12 + Number(match[1]) - 1;
+  return new Date(importacao.createdAt).getTime() / 2_592_000_000;
+}
+
+function Delta({ value, aumentoFavoravel = false }: { value: number; aumentoFavoravel?: boolean }) {
   const positive = value > 0.005;
   const negative = value < -0.005;
-  const color = positive ? "oklch(0.65 0.22 25)" : negative ? "oklch(0.70 0.18 155)" : "var(--muted-foreground)";
+  const color = positive
+    ? (aumentoFavoravel ? "oklch(0.70 0.18 155)" : "oklch(0.65 0.22 25)")
+    : negative
+      ? (aumentoFavoravel ? "oklch(0.65 0.22 25)" : "oklch(0.70 0.18 155)")
+      : "var(--muted-foreground)";
   return (
     <span className="inline-flex items-center gap-1 text-xs font-semibold tabular-nums" style={{ color }}>
       {positive ? <TrendingUp className="h-3.5 w-3.5" /> : negative ? <TrendingDown className="h-3.5 w-3.5" /> : null}
@@ -106,6 +116,10 @@ export default function HistoricoDados() {
   const [categoriaEvolucao, setCategoriaEvolucao] = useState("materia_prima");
 
   const importacoes = (registros ?? []) as Importacao[];
+  const importacoesOrdenadas = useMemo(
+    () => [...importacoes].sort((a, b) => indicePeriodo(a) - indicePeriodo(b)),
+    [importacoes]
+  );
   const restaurar = trpc.importacoes.restaurar.useMutation({
     onSuccess: async resultado => {
       await Promise.all([
@@ -121,18 +135,24 @@ export default function HistoricoDados() {
   });
 
   useEffect(() => {
-    if (!importacoes.length) return;
-    const ativaId = ativa?.id ?? importacoes[0].id;
-    setBaseId(atual => importacoes.some(item => item.id === atual) ? atual : ativaId);
-  }, [importacoes, ativa?.id]);
+    if (!importacoesOrdenadas.length) return;
+    setBaseId(atual => {
+      const atualIndice = importacoesOrdenadas.findIndex(item => item.id === atual);
+      return atualIndice >= 0 && atualIndice < importacoesOrdenadas.length - 1
+        ? atual
+        : importacoesOrdenadas[0].id;
+    });
+  }, [importacoesOrdenadas]);
 
   useEffect(() => {
-    if (!importacoes.length || baseId === null) return;
+    if (!importacoesOrdenadas.length || baseId === null) return;
     setCompararId(atual => {
-      if (atual !== null && atual !== baseId && importacoes.some(item => item.id === atual)) return atual;
-      return importacoes.find(item => item.id !== baseId)?.id ?? null;
+      const indiceBase = importacoesOrdenadas.findIndex(item => item.id === baseId);
+      const indiceAtual = importacoesOrdenadas.findIndex(item => item.id === atual);
+      if (indiceAtual > indiceBase) return atual;
+      return importacoesOrdenadas[indiceBase + 1]?.id ?? null;
     });
-  }, [importacoes, baseId]);
+  }, [importacoesOrdenadas, baseId]);
 
   const base = useMemo(() => importacoes.find(item => item.id === baseId) ?? null, [importacoes, baseId]);
   const comparacao = useMemo(() => importacoes.find(item => item.id === compararId) ?? null, [importacoes, compararId]);
@@ -149,7 +169,7 @@ export default function HistoricoDados() {
     if (!categoriasDisponiveis.includes(categoriaEvolucao)) setCategoriaEvolucao(categoriasDisponiveis[0] ?? "materia_prima");
   }, [categoriaEvolucao, categoriasDisponiveis]);
 
-  const dadosEvolucao = useMemo(() => importacoes.slice().reverse().map(importacao => {
+  const dadosEvolucao = useMemo(() => importacoesOrdenadas.map(importacao => {
     const medias = parseMedias(importacao.mediasPorCategoria);
     return {
       periodo: importacao.periodoInicio && importacao.periodoFim && importacao.periodoInicio !== importacao.periodoFim
@@ -157,7 +177,7 @@ export default function HistoricoDados() {
         : importacao.periodoInicio ?? formatData(importacao.createdAt).slice(0, 10),
       valor: categoriaEvolucao === "materia_prima" ? parseFloat(importacao.mediaMateriaPrima) : (medias[categoriaEvolucao] ?? 0),
     };
-  }), [importacoes, categoriaEvolucao]);
+  }), [importacoesOrdenadas, categoriaEvolucao]);
 
   const linhasComparacao = useMemo<LinhaComparacao[]>(() => {
     if (!base || !comparacao) return [];
@@ -174,9 +194,9 @@ export default function HistoricoDados() {
   }, [base, comparacao, mediasBase, mediasComparacao]);
 
   const resumoComparacao = useMemo(() => !base || !comparacao ? [] : [
-    { indicador: "Total de custos", referencia: parseFloat(base.totalCustos), comparada: parseFloat(comparacao.totalCustos) },
-    { indicador: "Matéria-prima no período", referencia: parseFloat(base.totalMateriaPrima), comparada: parseFloat(comparacao.totalMateriaPrima) },
-    { indicador: "Faturamento identificado", referencia: parseFloat(base.totalFaturamento), comparada: parseFloat(comparacao.totalFaturamento) },
+    { indicador: "Média mensal de custos", referencia: parseFloat(base.totalCustos) / base.numMeses, comparada: parseFloat(comparacao.totalCustos) / comparacao.numMeses },
+    { indicador: "Média mensal de matéria-prima", referencia: parseFloat(base.mediaMateriaPrima), comparada: parseFloat(comparacao.mediaMateriaPrima) },
+    { indicador: "Média mensal de faturamento", referencia: parseFloat(base.mediaFaturamento), comparada: parseFloat(comparacao.mediaFaturamento), aumentoFavoravel: true },
   ], [base, comparacao]);
 
   const dadosExportacao = useMemo(() => base && comparacao ? {
@@ -218,15 +238,15 @@ export default function HistoricoDados() {
           </section>
 
           <section className="rounded-xl p-4 sm:p-5 card-gradient" style={{ border: "1px solid var(--border)" }}>
-            <div className="mb-4 flex items-center gap-2"><ArrowRightLeft className="h-5 w-5" style={{ color: "var(--primary)" }} /><div><h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Comparar duas importações</h2><p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Compare médias mensais e variações de custos entre duas bases arquivadas.</p></div></div>
+            <div className="mb-4 flex items-center gap-2"><ArrowRightLeft className="h-5 w-5" style={{ color: "var(--primary)" }} /><div><h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Comparar duas importações</h2><p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Período seguinte − período inicial. Para custos, verde indica redução e vermelho indica aumento.</p></div></div>
             {importacoes.length < 2 ? <p className="rounded-lg p-3 text-sm" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>Confirme mais uma importação para habilitar a comparação lado a lado.</p> : (
               <>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <label className="space-y-1.5"><span className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Base de referência</span><select value={baseId ?? ""} onChange={event => setBaseId(Number(event.target.value))} className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>{importacoes.map(item => <option key={item.id} value={item.id}>{periodo(item)} — {item.nomeArquivo}</option>)}</select></label>
-                  <label className="space-y-1.5"><span className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Comparar com</span><select value={compararId ?? ""} onChange={event => setCompararId(Number(event.target.value))} className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>{importacoes.filter(item => item.id !== baseId).map(item => <option key={item.id} value={item.id}>{periodo(item)} — {item.nomeArquivo}</option>)}</select></label>
+                  <label className="space-y-1.5"><span className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Período inicial (referência)</span><select value={baseId ?? ""} onChange={event => setBaseId(Number(event.target.value))} className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>{importacoesOrdenadas.slice(0, -1).map(item => <option key={item.id} value={item.id}>{periodo(item)} — {item.nomeArquivo}</option>)}</select></label>
+                  <label className="space-y-1.5"><span className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Período seguinte (comparado)</span><select value={compararId ?? ""} onChange={event => setCompararId(Number(event.target.value))} className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>{importacoesOrdenadas.filter(item => indicePeriodo(item) > (base ? indicePeriodo(base) : -Infinity)).map(item => <option key={item.id} value={item.id}>{periodo(item)} — {item.nomeArquivo}</option>)}</select></label>
                 </div>
                 {dadosExportacao && <div className="mt-4 flex flex-wrap gap-2"><button onClick={() => void exportarComparacaoExcel(dadosExportacao).catch(() => toast.error("Não foi possível gerar o Excel."))} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all hover:opacity-80" style={{ background: "oklch(0.70 0.18 155 / 0.12)", color: "oklch(0.75 0.18 155)", border: "1px solid oklch(0.70 0.18 155 / 0.25)" }}><FileSpreadsheet className="h-4 w-4" />Exportar Excel</button><button onClick={() => void exportarComparacaoPdf(dadosExportacao).catch(() => toast.error("Não foi possível gerar o PDF."))} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all hover:opacity-80" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}><FileText className="h-4 w-4" />Exportar PDF</button><span className="inline-flex items-center gap-1 self-center text-xs" style={{ color: "var(--muted-foreground)" }}><Download className="h-3.5 w-3.5" />Baixa a comparação selecionada</span></div>}
-                {base && comparacao && <div className="mt-5 overflow-hidden rounded-lg" style={{ border: "1px solid var(--border)" }}><div className="overflow-x-auto"><table className="w-full min-w-[680px]"><thead><tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)" }}><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Categoria</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Referência</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Comparada</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Variação</th></tr></thead><tbody className="divide-y" style={{ borderColor: "var(--border)" }}>{linhasComparacao.map(linha => <tr key={linha.key} style={{ background: "var(--card)" }}><td className="px-4 py-3 text-sm" style={{ color: "var(--foreground)" }}>{linha.categoria}</td><td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: "var(--muted-foreground)" }}>{formatBRL(linha.referencia, 2)}/mês</td><td className="px-4 py-3 text-right text-sm font-medium tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(linha.comparada, 2)}/mês</td><td className="px-4 py-3 text-right"><Delta value={linha.comparada - linha.referencia} /></td></tr>)}</tbody></table></div><div className="grid grid-cols-1 gap-px border-t sm:grid-cols-3" style={{ background: "var(--border)", borderColor: "var(--border)" }}>{resumoComparacao.map(item => <div key={item.indicador} className="p-3" style={{ background: "var(--card)" }}><p className="text-xs" style={{ color: "var(--muted-foreground)" }}>{item.indicador}</p><div className="mt-1 flex items-center justify-between gap-2"><span className="text-sm font-semibold tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(item.comparada, 0)}</span><Delta value={item.comparada - item.referencia} /></div></div>)}</div></div>}
+                {base && comparacao && <div className="mt-5 overflow-hidden rounded-lg" style={{ border: "1px solid var(--border)" }}><div className="overflow-x-auto"><table className="w-full min-w-[680px]"><thead><tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)" }}><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Categoria</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Período inicial</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Período seguinte</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Variação</th></tr></thead><tbody className="divide-y" style={{ borderColor: "var(--border)" }}>{linhasComparacao.map(linha => <tr key={linha.key} style={{ background: "var(--card)" }}><td className="px-4 py-3 text-sm" style={{ color: "var(--foreground)" }}>{linha.categoria}</td><td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: "var(--muted-foreground)" }}>{formatBRL(linha.referencia, 2)}/mês</td><td className="px-4 py-3 text-right text-sm font-medium tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(linha.comparada, 2)}/mês</td><td className="px-4 py-3 text-right"><Delta value={linha.comparada - linha.referencia} /></td></tr>)}</tbody></table></div><div className="grid grid-cols-1 gap-px border-t sm:grid-cols-3" style={{ background: "var(--border)", borderColor: "var(--border)" }}>{resumoComparacao.map(item => <div key={item.indicador} className="p-3" style={{ background: "var(--card)" }}><p className="text-xs" style={{ color: "var(--muted-foreground)" }}>{item.indicador}</p><div className="mt-1 flex items-center justify-between gap-2"><span className="text-sm font-semibold tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(item.comparada, 0)}</span><Delta value={item.comparada - item.referencia} aumentoFavoravel={item.aumentoFavoravel} /></div></div>)}</div></div>}
               </>
             )}
           </section>
