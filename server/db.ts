@@ -140,11 +140,27 @@ export interface DadosHistoricoImportacao {
   mediaFaturamento: number;
 }
 
+const CATEGORIAS_IMPORTACAO = [
+  "folha_pagamento", "impostos_folha", "energia", "combustivel",
+  "transporte_frete", "manutencao", "servicos", "comissoes", "diversos",
+] as const;
+
 function agruparCustosAtivos(custos: Array<{ categoria: string; valorMensal: string }>) {
   return custos.reduce<Record<string, number>>((acumulado, custo) => {
     acumulado[custo.categoria] = (acumulado[custo.categoria] ?? 0) + parseFloat(custo.valorMensal);
     return acumulado;
   }, {});
+}
+
+function parseMediasHistorico(valor: string): Record<string, number> {
+  try {
+    const dados = JSON.parse(valor) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(dados).filter(([, media]) => typeof media === "number" && Number.isFinite(media)) as Array<[string, number]>
+    );
+  } catch {
+    return {};
+  }
 }
 
 export async function getHistoricoImportacoes(limit = 100) {
@@ -193,6 +209,56 @@ export async function salvarHistoricoImportacao(dados: DadosHistoricoImportacao)
 
 export async function definirImportacaoAtiva(id: number) {
   await setParametro("importacao_ativa_id", String(id), "ID do histórico de dados ativo nos cálculos");
+}
+
+/** Restaura as médias arquivadas e marca a fotografia escolhida como base ativa. */
+export async function restaurarHistoricoImportacao(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const registros = await db.select().from(historicoImportacoes)
+    .where(eq(historicoImportacoes.id, id))
+    .limit(1);
+  const registro = registros[0];
+  if (!registro) throw new Error("Base histórica não encontrada.");
+
+  const medias = parseMediasHistorico(registro.mediasPorCategoria);
+  const existentes = await db.select().from(custosFixos).where(eq(custosFixos.ativo, 1));
+  const labels: Record<string, string> = {
+    folha_pagamento: "Folha de Pagamento",
+    impostos_folha: "Impostos sobre Folha",
+    energia: "Energia Elétrica",
+    combustivel: "Combustível",
+    transporte_frete: "Transporte / Frete",
+    manutencao: "Manutenção e Peças",
+    servicos: "Serviços Terceirizados",
+    comissoes: "Comissões",
+    diversos: "Diversos",
+  };
+
+  for (const categoria of CATEGORIAS_IMPORTACAO) {
+    const valor = Number.isFinite(medias[categoria]) ? medias[categoria] : 0;
+    const daCategoria = existentes.filter(custo => custo.categoria === categoria);
+    if (daCategoria.length > 0) {
+      for (const custo of daCategoria) {
+        await db.update(custosFixos)
+          .set({ valorMensal: valor.toFixed(2), descricao: `${labels[categoria]} (restaurado do histórico)` })
+          .where(eq(custosFixos.id, custo.id));
+      }
+    } else {
+      await db.insert(custosFixos).values({
+        categoria,
+        descricao: `${labels[categoria]} (restaurado do histórico)`,
+        valorMensal: valor.toFixed(2),
+        ativo: 1,
+      });
+    }
+  }
+
+  await setParametro("total_mp_mensal", registro.mediaMateriaPrima, "Total mensal de MP restaurado do histórico");
+  await setParametro("faturamento_mensal_importado", registro.mediaFaturamento, "Faturamento mensal restaurado do histórico");
+  await definirImportacaoAtiva(registro.id);
+  return registro;
 }
 
 /**

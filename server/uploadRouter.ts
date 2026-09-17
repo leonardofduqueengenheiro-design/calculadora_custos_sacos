@@ -44,6 +44,12 @@ export interface PreviewImportacao {
   totalLinhas: number;
   linhasProcessadas: number;
   linhasIgnoradas: string[];
+  itensIgnorados: Array<{
+    id: string;
+    tipo: string;
+    fornecedor: string;
+    valor: number;
+  }>;
   mediasPorCategoria: Record<string, number>;
   mediaMateriaPrima: number;
   mediaFaturamento: number;
@@ -201,7 +207,7 @@ export function extrairPreviewPlanilha(workbook: XLSX.WorkBook): PreviewImportac
   const totaisPorCategoria: Record<string, number> = {};
   let totalFaturamento = 0;
   let totalMateriaPrima = 0;
-  const linhasIgnoradas: string[] = [];
+  const itensIgnorados: PreviewImportacao["itensIgnorados"] = [];
   let linhasProcessadas = 0;
   const mesesDetectados = new Set<string>();
 
@@ -236,7 +242,12 @@ export function extrairPreviewPlanilha(workbook: XLSX.WorkBook): PreviewImportac
       totaisPorCategoria[categoria] = (totaisPorCategoria[categoria] || 0) + valor;
       linhasProcessadas += 1;
     } else {
-      linhasIgnoradas.push(`${tipoRaw} (${fornecedor || "sem fornecedor"}) — R$ ${valor.toFixed(2)}`);
+      itensIgnorados.push({
+        id: `ignorado-${itensIgnorados.length + 1}`,
+        tipo: tipoRaw,
+        fornecedor: fornecedor || "sem fornecedor",
+        valor,
+      });
     }
   }
 
@@ -255,7 +266,8 @@ export function extrairPreviewPlanilha(workbook: XLSX.WorkBook): PreviewImportac
     }),
     totalLinhas: linhas.length,
     linhasProcessadas,
-    linhasIgnoradas: linhasIgnoradas.slice(0, 20),
+    linhasIgnoradas: itensIgnorados.map(item => `${item.tipo} (${item.fornecedor}) — R$ ${item.valor.toFixed(2)}`),
+    itensIgnorados,
     mediasPorCategoria,
     mediaMateriaPrima: totalMateriaPrima / numMeses,
     mediaFaturamento: totalFaturamento / numMeses,
@@ -273,6 +285,66 @@ export function obterIntervaloImportacao(mesesDetectados: unknown): { periodoIni
     periodoInicio: meses[0] ?? null,
     periodoFim: meses[meses.length - 1] ?? null,
   };
+}
+
+export type DestinoReclassificacao = CategoriaValida | "materia_prima" | "faturamento" | "manter_ignorado";
+
+/** Aplica, na prévia, as classificações escolhidas pelo usuário sem tocar no arquivo original. */
+export function aplicarReclassificacoes(
+  preview: PreviewImportacao,
+  classificacoes: Record<string, DestinoReclassificacao>
+): PreviewImportacao {
+  const resultado: PreviewImportacao = {
+    ...preview,
+    linhasIgnoradas: [...preview.linhasIgnoradas],
+    itensIgnorados: [...preview.itensIgnorados],
+    mediasPorCategoria: { ...preview.mediasPorCategoria },
+  };
+
+  for (const item of preview.itensIgnorados) {
+    const destino = classificacoes[item.id] ?? "manter_ignorado";
+    if (destino === "manter_ignorado") continue;
+
+    resultado.linhasProcessadas += 1;
+    if (destino === "materia_prima") {
+      resultado.totalMateriaPrima += item.valor;
+      resultado.mediaMateriaPrima = resultado.totalMateriaPrima / resultado.numMeses;
+    } else if (destino === "faturamento") {
+      resultado.totalFaturamento += item.valor;
+      resultado.mediaFaturamento = resultado.totalFaturamento / resultado.numMeses;
+    } else {
+      resultado.totalCustos += item.valor;
+      resultado.mediasPorCategoria[destino] = (resultado.mediasPorCategoria[destino] ?? 0) + item.valor / resultado.numMeses;
+    }
+    resultado.itensIgnorados = resultado.itensIgnorados.filter(ignorado => ignorado.id !== item.id);
+  }
+
+  resultado.linhasIgnoradas = resultado.itensIgnorados
+    .map(item => `${item.tipo} (${item.fornecedor}) — R$ ${item.valor.toFixed(2)}`);
+  return resultado;
+}
+
+function mesParaIndice(periodo: string | null | undefined): number | null {
+  if (!periodo) return null;
+  const match = periodo.match(/^(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const mes = Number(match[1]);
+  const ano = Number(match[2]);
+  return mes >= 1 && mes <= 12 ? ano * 12 + mes - 1 : null;
+}
+
+export function periodosSeSobrepoem(
+  inicioA: string | null | undefined,
+  fimA: string | null | undefined,
+  inicioB: string | null | undefined,
+  fimB: string | null | undefined,
+): boolean {
+  const inicioAIndice = mesParaIndice(inicioA);
+  const fimAIndice = mesParaIndice(fimA);
+  const inicioBIndice = mesParaIndice(inicioB);
+  const fimBIndice = mesParaIndice(fimB);
+  if ([inicioAIndice, fimAIndice, inicioBIndice, fimBIndice].some(indice => indice === null)) return false;
+  return inicioAIndice! <= fimBIndice! && inicioBIndice! <= fimAIndice!;
 }
 
 export function registerUploadRoutes(app: express.Application) {

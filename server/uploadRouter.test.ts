@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { extrairPreviewPlanilha, obterIntervaloImportacao, parseValor } from "./uploadRouter";
+import {
+  aplicarReclassificacoes,
+  extrairPreviewPlanilha,
+  obterIntervaloImportacao,
+  parseValor,
+  periodosSeSobrepoem,
+} from "./uploadRouter";
 
 function criarPlanilhaNovoFormato() {
   const linhas = [
@@ -48,5 +54,36 @@ describe("Importação da nova planilha de controle", () => {
       periodoFim: "04/2026",
     });
     expect(obterIntervaloImportacao([])).toEqual({ periodoInicio: null, periodoFim: null });
+  });
+
+  it("reclassifica um item ignorado antes de confirmar sem alterar o original", () => {
+    const preview = {
+      numMeses: 2,
+      mesesDetectados: ["09/2026", "10/2026"],
+      totalLinhas: 1,
+      linhasProcessadas: 0,
+      linhasIgnoradas: ["Despesa especial (Fornecedor) — R$ 100.00"],
+      itensIgnorados: [{ id: "ignorado-1", tipo: "Despesa especial", fornecedor: "Fornecedor", valor: 100 }],
+      mediasPorCategoria: {},
+      mediaMateriaPrima: 0,
+      mediaFaturamento: 0,
+      totalFaturamento: 0,
+      totalMateriaPrima: 0,
+      totalCustos: 0,
+    };
+    const revisada = aplicarReclassificacoes(preview, { "ignorado-1": "servicos" });
+
+    expect(revisada.linhasProcessadas).toBe(1);
+    expect(revisada.itensIgnorados).toHaveLength(0);
+    expect(revisada.mediasPorCategoria.servicos).toBeCloseTo(50, 2);
+    expect(revisada.totalCustos).toBeCloseTo(100, 2);
+    expect(preview.itensIgnorados).toHaveLength(1);
+    expect(preview.totalCustos).toBe(0);
+  });
+
+  it("detecta períodos que se sobrepõem", () => {
+    expect(periodosSeSobrepoem("01/2025", "04/2026", "03/2026", "08/2026")).toBe(true);
+    expect(periodosSeSobrepoem("01/2025", "04/2026", "05/2026", "08/2026")).toBe(false);
+    expect(periodosSeSobrepoem(null, null, "05/2026", "08/2026")).toBe(false);
   });
 });

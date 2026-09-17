@@ -31,6 +31,7 @@ import {
   deleteAnalise,
   getHistoricoImportacoes,
   getImportacaoAtiva,
+  restaurarHistoricoImportacao,
 } from "./db";
 
 // ─── Lógica de cálculo financeiro ────────────────────────────────────────────
@@ -455,6 +456,12 @@ const simulacoesRouter = router({
 const importacoesRouter = router({
   list: publicProcedure.query(async () => getHistoricoImportacoes()),
   ativa: publicProcedure.query(async () => getImportacaoAtiva()),
+  restaurar: publicProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      const registro = await restaurarHistoricoImportacao(input.id);
+      return { success: true, registro };
+    }),
 });
 
 const produtosRouter = router({
