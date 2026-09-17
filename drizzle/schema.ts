@@ -98,6 +98,19 @@ export const regrasClassificacaoImportacao = mysqlTable("regras_classificacao_im
 export type RegraClassificacaoImportacao = typeof regrasClassificacaoImportacao.$inferSelect;
 export type InsertRegraClassificacaoImportacao = typeof regrasClassificacaoImportacao.$inferInsert;
 
+// Metas opcionais de redução percentual por categoria de custo.
+// Só existem para as categorias que o usuário decidir acompanhar.
+export const metasReducaoCategoria = mysqlTable("metas_reducao_categoria", {
+  id: int("id").autoincrement().primaryKey(),
+  categoria: varchar("categoria", { length: 50 }).notNull().unique(),
+  percentualMeta: decimal("percentual_meta", { precision: 8, scale: 4 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MetaReducaoCategoria = typeof metasReducaoCategoria.$inferSelect;
+export type InsertMetaReducaoCategoria = typeof metasReducaoCategoria.$inferInsert;
+
 // Histórico de simulações
 export const simulacoes = mysqlTable("simulacoes", {
   id: int("id").autoincrement().primaryKey(),

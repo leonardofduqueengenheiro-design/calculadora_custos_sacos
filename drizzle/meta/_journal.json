@@ -57,6 +57,13 @@
       "when": 1789668907165,
       "tag": "0007_fat_marvel_apes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1789672254092,
+      "tag": "0008_lowly_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

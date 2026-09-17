@@ -5,7 +5,7 @@ import { exportarComparacaoExcel, exportarComparacaoPdf } from "@/lib/exportComp
 import {
   Archive, ArrowRightLeft, CalendarRange, Database, Download,
   FileSpreadsheet, FileText, RefreshCw, RotateCcw, TrendingDown,
-  TrendingUp, ChartNoAxesCombined,
+  TrendingUp, ChartNoAxesCombined, Goal, Save, Trash2, CircleCheck,
 } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -103,6 +103,15 @@ function Delta({ value, percentual, aumentoFavoravel = false }: { value: number;
   );
 }
 
+function ImpactoMargem({ variacaoCusto, faturamentoMensal }: { variacaoCusto: number; faturamentoMensal: number }) {
+  const impactoLucro = -variacaoCusto;
+  const ganho = impactoLucro > 0.005;
+  const perda = impactoLucro < -0.005;
+  const color = ganho ? "oklch(0.70 0.18 155)" : perda ? "oklch(0.65 0.22 25)" : "var(--muted-foreground)";
+  const pontosMargem = faturamentoMensal > 0 ? (impactoLucro / faturamentoMensal) * 100 : null;
+  return <div className="text-right text-xs font-semibold tabular-nums" style={{ color }}><p>{impactoLucro > 0 ? "+" : ""}{formatBRL(impactoLucro, 2)}/mês</p>{pontosMargem !== null && <p className="mt-0.5 font-medium opacity-80">{pontosMargem > 0 ? "+" : ""}{pontosMargem.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} p.p.</p>}</div>;
+}
+
 function GraficoTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number }> }) {
   if (!active || !payload?.length) return null;
   return (
@@ -117,9 +126,13 @@ export default function HistoricoDados() {
   const utils = trpc.useUtils();
   const { data: registros, isLoading, refetch } = trpc.importacoes.list.useQuery();
   const { data: ativa } = trpc.importacoes.ativa.useQuery();
+  const { data: resumoFinanceiro } = trpc.calculo.resumo.useQuery();
+  const { data: metasData } = trpc.metasReducao.list.useQuery();
   const [baseId, setBaseId] = useState<number | null>(null);
   const [compararId, setCompararId] = useState<number | null>(null);
   const [categoriaEvolucao, setCategoriaEvolucao] = useState("materia_prima");
+  const [novaMetaCategoria, setNovaMetaCategoria] = useState("materia_prima");
+  const [novoPercentualMeta, setNovoPercentualMeta] = useState("");
 
   const importacoes = (registros ?? []) as Importacao[];
   const importacoesOrdenadas = useMemo(
@@ -138,6 +151,21 @@ export default function HistoricoDados() {
       toast.success(`Base restaurada: ${resultado.registro.nomeArquivo}`);
     },
     onError: error => toast.error(error.message || "Não foi possível restaurar esta base."),
+  });
+  const salvarMeta = trpc.metasReducao.salvar.useMutation({
+    onSuccess: async () => {
+      await utils.metasReducao.list.invalidate();
+      setNovoPercentualMeta("");
+      toast.success("Meta de redução salva.");
+    },
+    onError: error => toast.error(error.message || "Informe uma meta entre 0,01% e 100%."),
+  });
+  const excluirMeta = trpc.metasReducao.excluir.useMutation({
+    onSuccess: () => {
+      utils.metasReducao.list.invalidate();
+      toast.success("Meta removida.");
+    },
+    onError: error => toast.error(error.message || "Não foi possível remover a meta."),
   });
 
   useEffect(() => {
@@ -217,6 +245,13 @@ export default function HistoricoDados() {
     .sort((a, b) => b.variacao - a.variacao)
     .slice(0, 3), [linhasComparacao]);
 
+  const faturamentoMensalImpacto = resumoFinanceiro?.faturamentoMensal ?? 0;
+  const metas = metasData ?? [];
+  const metaPorCategoria = useMemo(
+    () => new Map(metas.map(meta => [meta.categoria, { id: meta.id, percentual: parseFloat(meta.percentualMeta) }])),
+    [metas]
+  );
+
   const dadosExportacao = useMemo(() => base && comparacao ? {
     referencia: { nome: base.nomeArquivo, periodo: periodo(base) },
     comparada: { nome: comparacao.nomeArquivo, periodo: periodo(comparacao) },
@@ -264,9 +299,27 @@ export default function HistoricoDados() {
                   <label className="space-y-1.5"><span className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>Período seguinte (comparado)</span><select value={compararId ?? ""} onChange={event => setCompararId(Number(event.target.value))} className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>{importacoesOrdenadas.filter(item => indicePeriodo(item) > (base ? indicePeriodo(base) : -Infinity)).map(item => <option key={item.id} value={item.id}>{periodo(item)} — {item.nomeArquivo}</option>)}</select></label>
                 </div>
                 {dadosExportacao && <div className="mt-4 flex flex-wrap gap-2"><button onClick={() => void exportarComparacaoExcel(dadosExportacao).catch(() => toast.error("Não foi possível gerar o Excel."))} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all hover:opacity-80" style={{ background: "oklch(0.70 0.18 155 / 0.12)", color: "oklch(0.75 0.18 155)", border: "1px solid oklch(0.70 0.18 155 / 0.25)" }}><FileSpreadsheet className="h-4 w-4" />Exportar Excel</button><button onClick={() => void exportarComparacaoPdf(dadosExportacao).catch(() => toast.error("Não foi possível gerar o PDF."))} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all hover:opacity-80" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}><FileText className="h-4 w-4" />Exportar PDF</button><span className="inline-flex items-center gap-1 self-center text-xs" style={{ color: "var(--muted-foreground)" }}><Download className="h-3.5 w-3.5" />Baixa a comparação selecionada</span></div>}
-                {base && comparacao && <><div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2"><div className="rounded-lg p-4" style={{ background: "oklch(0.70 0.18 155 / 0.08)", border: "1px solid oklch(0.70 0.18 155 / 0.25)" }}><div className="mb-3 flex items-center gap-2"><TrendingDown className="h-4 w-4" style={{ color: "oklch(0.70 0.18 155)" }} /><p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>3 maiores reduções de custo</p></div>{maioresReducoes.length ? <div className="space-y-2">{maioresReducoes.map(linha => <div key={linha.key} className="flex items-center justify-between gap-3 text-xs"><span style={{ color: "var(--foreground)" }}>{linha.categoria}</span><Delta value={linha.variacao} percentual={percentualVariacao(linha.referencia, linha.comparada)} /></div>)}</div> : <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Não houve redução de custo entre os períodos.</p>}</div><div className="rounded-lg p-4" style={{ background: "oklch(0.65 0.22 25 / 0.08)", border: "1px solid oklch(0.65 0.22 25 / 0.25)" }}><div className="mb-3 flex items-center gap-2"><TrendingUp className="h-4 w-4" style={{ color: "oklch(0.65 0.22 25)" }} /><p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>3 maiores aumentos de custo</p></div>{maioresAumentos.length ? <div className="space-y-2">{maioresAumentos.map(linha => <div key={linha.key} className="flex items-center justify-between gap-3 text-xs"><span style={{ color: "var(--foreground)" }}>{linha.categoria}</span><Delta value={linha.variacao} percentual={percentualVariacao(linha.referencia, linha.comparada)} /></div>)}</div> : <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Não houve aumento de custo entre os períodos.</p>}</div></div><div className="mt-4 overflow-hidden rounded-lg" style={{ border: "1px solid var(--border)" }}><div className="overflow-x-auto"><table className="w-full min-w-[720px]"><thead><tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)" }}><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Categoria</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Período inicial</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Período seguinte</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Variação (R$ e %)</th></tr></thead><tbody className="divide-y" style={{ borderColor: "var(--border)" }}>{linhasComparacao.map(linha => <tr key={linha.key} style={{ background: "var(--card)" }}><td className="px-4 py-3 text-sm" style={{ color: "var(--foreground)" }}>{linha.categoria}</td><td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: "var(--muted-foreground)" }}>{formatBRL(linha.referencia, 2)}/mês</td><td className="px-4 py-3 text-right text-sm font-medium tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(linha.comparada, 2)}/mês</td><td className="px-4 py-3 text-right"><Delta value={linha.comparada - linha.referencia} percentual={percentualVariacao(linha.referencia, linha.comparada)} /></td></tr>)}</tbody></table></div><div className="grid grid-cols-1 gap-px border-t sm:grid-cols-3" style={{ background: "var(--border)", borderColor: "var(--border)" }}>{resumoComparacao.map(item => <div key={item.indicador} className="p-3" style={{ background: "var(--card)" }}><p className="text-xs" style={{ color: "var(--muted-foreground)" }}>{item.indicador}</p><div className="mt-1 flex items-center justify-between gap-2"><span className="text-sm font-semibold tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(item.comparada, 0)}</span><Delta value={item.comparada - item.referencia} percentual={percentualVariacao(item.referencia, item.comparada)} aumentoFavoravel={item.aumentoFavoravel} /></div></div>)}</div></div></>}
+                {base && comparacao && <><div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2"><div className="rounded-lg p-4" style={{ background: "oklch(0.70 0.18 155 / 0.08)", border: "1px solid oklch(0.70 0.18 155 / 0.25)" }}><div className="mb-3 flex items-center gap-2"><TrendingDown className="h-4 w-4" style={{ color: "oklch(0.70 0.18 155)" }} /><p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>3 maiores reduções de custo</p></div>{maioresReducoes.length ? <div className="space-y-2">{maioresReducoes.map(linha => <div key={linha.key} className="flex items-center justify-between gap-3 text-xs"><span style={{ color: "var(--foreground)" }}>{linha.categoria}</span><Delta value={linha.variacao} percentual={percentualVariacao(linha.referencia, linha.comparada)} /></div>)}</div> : <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Não houve redução de custo entre os períodos.</p>}</div><div className="rounded-lg p-4" style={{ background: "oklch(0.65 0.22 25 / 0.08)", border: "1px solid oklch(0.65 0.22 25 / 0.25)" }}><div className="mb-3 flex items-center gap-2"><TrendingUp className="h-4 w-4" style={{ color: "oklch(0.65 0.22 25)" }} /><p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>3 maiores aumentos de custo</p></div>{maioresAumentos.length ? <div className="space-y-2">{maioresAumentos.map(linha => <div key={linha.key} className="flex items-center justify-between gap-3 text-xs"><span style={{ color: "var(--foreground)" }}>{linha.categoria}</span><Delta value={linha.variacao} percentual={percentualVariacao(linha.referencia, linha.comparada)} /></div>)}</div> : <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Não houve aumento de custo entre os períodos.</p>}</div></div><div className="mt-4 overflow-hidden rounded-lg" style={{ border: "1px solid var(--border)" }}><div className="overflow-x-auto"><table className="w-full min-w-[900px]"><thead><tr style={{ background: "var(--muted)", borderBottom: "1px solid var(--border)" }}><th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Categoria</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Período inicial</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Período seguinte</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Variação (R$ e %)</th><th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>Impacto estimado na margem</th></tr></thead><tbody className="divide-y" style={{ borderColor: "var(--border)" }}>{linhasComparacao.map(linha => <tr key={linha.key} style={{ background: "var(--card)" }}><td className="px-4 py-3 text-sm" style={{ color: "var(--foreground)" }}>{linha.categoria}</td><td className="px-4 py-3 text-right text-sm tabular-nums" style={{ color: "var(--muted-foreground)" }}>{formatBRL(linha.referencia, 2)}/mês</td><td className="px-4 py-3 text-right text-sm font-medium tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(linha.comparada, 2)}/mês</td><td className="px-4 py-3 text-right"><Delta value={linha.comparada - linha.referencia} percentual={percentualVariacao(linha.referencia, linha.comparada)} /></td><td className="px-4 py-3"><ImpactoMargem variacaoCusto={linha.comparada - linha.referencia} faturamentoMensal={faturamentoMensalImpacto} /></td></tr>)}</tbody></table></div><div className="grid grid-cols-1 gap-px border-t sm:grid-cols-3" style={{ background: "var(--border)", borderColor: "var(--border)" }}>{resumoComparacao.map(item => <div key={item.indicador} className="p-3" style={{ background: "var(--card)" }}><p className="text-xs" style={{ color: "var(--muted-foreground)" }}>{item.indicador}</p><div className="mt-1 flex items-center justify-between gap-2"><span className="text-sm font-semibold tabular-nums" style={{ color: "var(--foreground)" }}>{formatBRL(item.comparada, 0)}</span><Delta value={item.comparada - item.referencia} percentual={percentualVariacao(item.referencia, item.comparada)} aumentoFavoravel={item.aumentoFavoravel} /></div></div>)}</div></div><p className="mt-2 text-xs" style={{ color: "var(--muted-foreground)" }}>Impacto estimado: variação mensal do custo convertida em ganho ou perda de lucro e pontos percentuais de margem, usando o faturamento mensal atual de {formatBRL(faturamentoMensalImpacto, 0)}.</p></>}
               </>
             )}
+          </section>
+
+          <section className="rounded-xl p-4 sm:p-5 card-gradient" style={{ border: "1px solid var(--border)" }}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center gap-2"><Goal className="h-5 w-5" style={{ color: "var(--primary)" }} /><div><h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Metas de redução por categoria</h2><p className="text-xs" style={{ color: "var(--muted-foreground)" }}>Opcional: crie metas apenas para as categorias que quiser acompanhar.</p></div></div>
+            </div>
+            <form onSubmit={event => { event.preventDefault(); const percentual = Number(novoPercentualMeta.replace(",", ".")); if (!Number.isFinite(percentual) || percentual <= 0) { toast.error("Informe uma meta de redução maior que zero."); return; } salvarMeta.mutate({ categoria: novaMetaCategoria as "materia_prima" | "folha_pagamento" | "impostos_folha" | "energia" | "combustivel" | "transporte_frete" | "manutencao" | "servicos" | "comissoes" | "diversos", percentualMeta: percentual }); }} className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
+              <select value={novaMetaCategoria} onChange={event => setNovaMetaCategoria(event.target.value)} className="rounded-lg px-3 py-2 text-sm" style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}>{Object.entries(CATEGORIA_LABELS).map(([categoria, label]) => <option key={categoria} value={categoria}>{label}</option>)}</select>
+              <div className="flex rounded-lg" style={{ background: "var(--secondary)", border: "1px solid var(--border)" }}><input value={novoPercentualMeta} onChange={event => setNovoPercentualMeta(event.target.value)} inputMode="decimal" placeholder="Meta de redução" className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none" style={{ color: "var(--foreground)" }} /><span className="pr-3 pt-2 text-sm" style={{ color: "var(--muted-foreground)" }}>%</span></div>
+              <button type="submit" disabled={salvarMeta.isPending} className="flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all hover:opacity-80 disabled:opacity-50" style={{ background: "var(--primary)", color: "white" }}><Save className="h-4 w-4" />Salvar meta</button>
+            </form>
+            {metas.length > 0 ? <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">{metas.map(meta => {
+              const linha = linhasComparacao.find(item => item.key === meta.categoria);
+              const metaAtual = metaPorCategoria.get(meta.categoria);
+              const reducaoReal = linha ? -(percentualVariacao(linha.referencia, linha.comparada) ?? 0) : null;
+              const atingida = reducaoReal !== null && reducaoReal >= (metaAtual?.percentual ?? parseFloat(meta.percentualMeta));
+              return <div key={meta.id} className="flex items-center justify-between gap-3 rounded-lg p-3" style={{ background: atingida ? "oklch(0.70 0.18 155 / 0.08)" : "var(--muted)", border: `1px solid ${atingida ? "oklch(0.70 0.18 155 / 0.25)" : "var(--border)"}` }}><div className="min-w-0"><p className="truncate text-sm font-semibold" style={{ color: "var(--foreground)" }}>{CATEGORIA_LABELS[meta.categoria] ?? meta.categoria}</p><p className="mt-0.5 text-xs" style={{ color: atingida ? "oklch(0.70 0.18 155)" : "var(--muted-foreground)" }}>{atingida ? <><CircleCheck className="mr-1 inline h-3.5 w-3.5" />Meta atingida</> : "Meta em acompanhamento"} · reduzir {parseFloat(meta.percentualMeta).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%{reducaoReal !== null && ` · atual ${reducaoReal.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}</p></div><button type="button" onClick={() => excluirMeta.mutate({ id: meta.id })} disabled={excluirMeta.isPending} className="rounded p-1.5 transition-opacity hover:opacity-70 disabled:opacity-50" style={{ color: "var(--muted-foreground)" }} title="Remover meta" aria-label={`Remover meta de ${CATEGORIA_LABELS[meta.categoria] ?? meta.categoria}`}><Trash2 className="h-4 w-4" /></button></div>;
+            })}</div> : <p className="mt-4 rounded-lg p-3 text-xs" style={{ background: "var(--muted)", color: "var(--muted-foreground)" }}>Nenhuma meta definida. Isso não interfere nos cálculos ou nas comparações.</p>}
           </section>
 
           <div className="space-y-4">

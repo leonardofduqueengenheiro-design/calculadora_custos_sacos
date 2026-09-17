@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, analiseItens, analisesPeriodo, custosFixos, historicoCustoMp, historicoImportacoes, materiasPrimas, parametros, produtoMateriasPrimas, produtos, regrasClassificacaoImportacao, simulacoes, users } from "../drizzle/schema";
+import { InsertUser, analiseItens, analisesPeriodo, custosFixos, historicoCustoMp, historicoImportacoes, materiasPrimas, metasReducaoCategoria, parametros, produtoMateriasPrimas, produtos, regrasClassificacaoImportacao, simulacoes, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -150,6 +150,28 @@ export async function desativarRegraClassificacaoImportacao(id: number) {
   await db.update(regrasClassificacaoImportacao)
     .set({ ativo: 0 })
     .where(eq(regrasClassificacaoImportacao.id, id));
+}
+
+// ─── Metas opcionais de redução ──────────────────────────────────────────────
+
+export async function getMetasReducaoCategoria() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(metasReducaoCategoria);
+}
+
+export async function salvarMetaReducaoCategoria(categoria: string, percentualMeta: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.insert(metasReducaoCategoria).values({ categoria, percentualMeta }).onDuplicateKeyUpdate({
+    set: { percentualMeta },
+  });
+}
+
+export async function excluirMetaReducaoCategoria(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.delete(metasReducaoCategoria).where(eq(metasReducaoCategoria.id, id));
 }
 
 // ─── Histórico de Importações ─────────────────────────────────────────────────

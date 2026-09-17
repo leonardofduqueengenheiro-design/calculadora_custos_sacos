@@ -35,6 +35,9 @@ import {
   restaurarHistoricoImportacao,
   salvarRegraClassificacaoImportacao,
   desativarRegraClassificacaoImportacao,
+  getMetasReducaoCategoria,
+  salvarMetaReducaoCategoria,
+  excluirMetaReducaoCategoria,
 } from "./db";
 
 // ─── Lógica de cálculo financeiro ────────────────────────────────────────────
@@ -488,6 +491,25 @@ const importacoesRouter = router({
     }),
 });
 
+const metasReducaoRouter = router({
+  list: publicProcedure.query(async () => getMetasReducaoCategoria()),
+  salvar: publicProcedure
+    .input(z.object({
+      categoria: z.enum(["materia_prima", "folha_pagamento", "impostos_folha", "energia", "combustivel", "transporte_frete", "manutencao", "servicos", "comissoes", "diversos"]),
+      percentualMeta: z.number().min(0.01).max(100),
+    }))
+    .mutation(async ({ input }) => {
+      await salvarMetaReducaoCategoria(input.categoria, input.percentualMeta.toFixed(4));
+      return { success: true };
+    }),
+  excluir: publicProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
+      await excluirMetaReducaoCategoria(input.id);
+      return { success: true };
+    }),
+});
+
 const produtosRouter = router({
   list: publicProcedure.query(async () => {
     const prods = await getProdutos();
@@ -858,6 +880,7 @@ export const appRouter = router({
   calculo: calculoRouter,
   simulacoes: simulacoesRouter,
   importacoes: importacoesRouter,
+  metasReducao: metasReducaoRouter,
   materiasPrimas: materiasPrimasRouter,
   produtos: produtosRouter,
   analises: analisesRouter,
