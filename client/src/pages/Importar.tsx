@@ -119,12 +119,12 @@ export default function Importar() {
             Importar Planilha
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>
-            Faça upload da sua planilha de controle mensal para atualizar automaticamente os custos da calculadora
+            Envie a planilha de controle com vencimento, valor, fornecedor e tipo para atualizar as médias da calculadora
           </p>
         </div>
         <a
-          href="/manus-storage/MODELO_CONTROLE_FINANCEIRO_SACOS_34f15913.xlsx"
-          download="MODELO_CONTROLE_FINANCEIRO_SACOS.xlsx"
+          href="/manus-storage/MODELO_CONTROLE_FINANCEIRO_LUKPLAST_V2_79d1c97b.xlsx"
+          download="MODELO_CONTROLE_FINANCEIRO_LUKPLAST.xlsx"
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-80"
           style={{ background: "var(--secondary)", color: "var(--foreground)", border: "1px solid var(--border)" }}
         >
@@ -197,7 +197,7 @@ export default function Importar() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {[
-                { n: "1", t: "Preencha a planilha modelo", d: "Baixe o modelo acima e lance seus custos mensais conforme o padrão" },
+                { n: "1", t: "Preencha os quatro campos essenciais", d: "Informe Vencimento, Valor, Fornecedor/Descrição e Tipo; os demais campos ficam para seu controle" },
                 { n: "2", t: "Faça o upload", d: "Arraste o arquivo ou clique para selecionar. O sistema lê automaticamente todas as abas" },
                 { n: "3", t: "Revise e confirme", d: "Veja o resumo dos dados extraídos e confirme para atualizar a calculadora" },
               ].map(item => (
@@ -217,7 +217,7 @@ export default function Importar() {
           {/* Tipos reconhecidos */}
           <div className="rounded-xl p-5" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
             <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--foreground)" }}>
-              Tipos de lançamento reconhecidos automaticamente
+              Tipos de lançamento reconhecidos no campo “Tipo”
             </h3>
             <div className="flex flex-wrap gap-2">
               {["Matéria-Prima", "Folha de Pagamento", "Impostos sobre Folha", "Energia Elétrica", "Combustível", "Transporte/Frete", "Manutenção/Peças", "Serviços", "Comissão", "Seguros", "Água/Saneamento", "Faturamento", "Diversos"].map(t => (
